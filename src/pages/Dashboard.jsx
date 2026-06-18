@@ -1,165 +1,320 @@
 import { T } from '../utils/tokens.js'
-import { ZAR, fmtDate } from '../utils/format.js'
+import { ZAR, fmtDate, clamp } from '../utils/format.js'
 import { MILESTONES_COMPLETED, MILESTONES_UPCOMING } from '../utils/data.js'
 
+// ── Score Ring ────────────────────────────────────────────────────────────────
+function Ring({ score, color, size = 80, strokeW = 7 }) {
+  const r    = (size - strokeW * 2) / 2
+  const circ = 2 * Math.PI * r
+  const off  = circ * (1 - score / 100)
+  return (
+    <div className="ring-wrap" style={{ width: size, height: size }}>
+      <svg className="ring-svg" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle className="ring-bg" cx={size/2} cy={size/2} r={r} strokeWidth={strokeW} />
+        <circle
+          className="ring-fg"
+          cx={size/2} cy={size/2} r={r}
+          stroke={color} strokeWidth={strokeW}
+          strokeDasharray={circ}
+          strokeDashoffset={off}
+        />
+      </svg>
+      <div className="ring-text">
+        <span className="ring-num" style={{ fontSize: size * 0.24, color }}>{score}</span>
+        <span className="ring-unit">/ 100</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Mini Bar Chart ─────────────────────────────────────────────────────────────
+function MiniChart({ data, color }) {
+  if (!data.length) return <div style={{ height: 40, display:'flex', alignItems:'center', fontSize:11, color:T.textLight }}>No data yet</div>
+  const max = Math.max(...data, 1)
+  return (
+    <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:40 }}>
+      {data.map((v, i) => (
+        <div key={i} style={{
+          flex: 1, borderRadius:'3px 3px 0 0',
+          background: `linear-gradient(180deg, ${color}CC, ${color}55)`,
+          height: `${clamp(Math.round((v / max) * 100), 4, 100)}%`,
+          minWidth: 6, transition: 'height 0.6s ease',
+        }} />
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard({ suppliers, products, finance, tasks, documents, setPage }) {
-  const foundersCount = products.filter(p => p.foundersCollection).length
-  const totalInvested = finance.filter(t => t.type === 'Owner Investment').reduce((s, t) => s + Number(t.amount), 0)
-  const totalIncome   = finance.filter(t => t.type === 'Business Income').reduce((s, t) => s + Number(t.amount), 0)
-  const totalExpenses = finance.filter(t => t.type === 'Business Expense').reduce((s, t) => s + Number(t.amount), 0)
-  const remaining     = totalInvested - totalExpenses
-  const netPosition   = totalIncome - totalExpenses
+  // ── Derived figures ──────────────────────────────────────────────────────────
+  const invested  = finance.filter(t => t.type === 'Owner Investment').reduce((s, t) => s + Number(t.amount), 0)
+  const income    = finance.filter(t => t.type === 'Business Income').reduce((s, t) => s + Number(t.amount), 0)
+  const expenses  = finance.filter(t => t.type === 'Business Expense').reduce((s, t) => s + Number(t.amount), 0)
+  const remaining = invested - expenses
+  const netPos    = income - expenses
+
   const openTasks     = tasks.filter(t => t.status !== 'Completed').length
-  const criticalTasks = tasks.filter(t => t.priority === 'Critical' && t.status !== 'Completed').length
+  const critTasks     = tasks.filter(t => t.priority === 'Critical' && t.status !== 'Completed').length
+  const doneTasks     = tasks.filter(t => t.status === 'Completed').length
+  const foundersCount = products.filter(p => p.foundersCollection).length
+
+  // ── Health scores ────────────────────────────────────────────────────────────
+  const totalMilestones = MILESTONES_COMPLETED.length + MILESTONES_UPCOMING.length
+  const progressScore   = clamp(Math.round((MILESTONES_COMPLETED.length / totalMilestones) * 100), 0, 100)
+  const financeScore    = invested > 0
+    ? clamp(Math.round(((remaining / invested) * 55) + (income > 0 ? 30 : 0) + 15), 0, 100)
+    : 20
+  const taskScore       = tasks.length > 0 ? clamp(Math.round((doneTasks / tasks.length) * 100), 0, 100) : 40
+  const healthScore     = Math.round((progressScore + financeScore + taskScore) / 3)
+
+  // ── Recent expense data for mini chart ───────────────────────────────────────
+  const expData = finance
+    .filter(t => t.type === 'Business Expense')
+    .slice(-8).map(t => Number(t.amount))
+
+  const importerStatus = MILESTONES_UPCOMING.find(m => m.label === 'Importer Registration')?.status || 'Not Started'
+
+  // ── KPI card configs ─────────────────────────────────────────────────────────
+  const kpiCards = [
+    {
+      label: 'Owner Investment', value: ZAR(invested), color: T.teal,
+      chipBg: T.tealPale, chipColor: T.teal, chip: 'Capital In',
+      bar: null, cls: 'border-inv', page: 'finance',
+    },
+    {
+      label: 'Cash Position', value: ZAR(remaining), color: remaining >= 0 ? T.gold : T.danger,
+      chipBg: remaining >= 0 ? T.goldPale : T.redPale,
+      chipColor: remaining >= 0 ? T.gold : T.danger,
+      chip: remaining >= 0 ? 'Positive' : 'Deficit',
+      bar: invested > 0 ? clamp(Math.round((remaining / invested) * 100), 0, 100) : 0,
+      barColor: remaining >= 0 ? T.gold : T.danger,
+      cls: 'border-rem', page: 'finance',
+    },
+    {
+      label: 'Business Income', value: ZAR(income), color: T.green,
+      chipBg: T.greenPale, chipColor: T.green, chip: income > 0 ? 'Revenue' : 'Pre-Revenue',
+      bar: null, cls: 'border-inc', page: 'finance',
+    },
+    {
+      label: 'Total Expenses', value: ZAR(expenses), color: T.red,
+      chipBg: T.redPale, chipColor: T.red, chip: `${finance.filter(t=>t.type==='Business Expense').length} txns`,
+      bar: null, cls: 'border-exp', page: 'finance',
+    },
+    {
+      label: 'Net Position', value: ZAR(netPos), color: netPos >= 0 ? T.forestLight : T.danger,
+      chipBg: netPos >= 0 ? T.greenPale : T.redPale,
+      chipColor: netPos >= 0 ? T.green : T.danger,
+      chip: netPos >= 0 ? 'Positive' : 'Negative',
+      bar: null, cls: 'border-net', page: 'finance',
+    },
+  ]
 
   return (
     <div>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="page-header">
         <div>
           <div className="page-title">Dashboard</div>
-          <div className="page-subtitle">Botanica Living Group — Operational Overview</div>
+          <div className="page-subtitle">Botanica Living Group · Executive Overview</div>
         </div>
-        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontStyle:'italic', color:T.gold }}>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontStyle:'italic', color:T.gold, opacity:0.85 }}>
           "Sell first. Scale second."
         </div>
       </div>
 
       <div className="page-content">
 
-        {/* Company Status */}
-        <div className="card mb-20" style={{ background:T.forest, border:'none' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        {/* ── Company Banner ──────────────────────────────────────────────── */}
+        <div className="company-banner mb20" style={{ marginBottom:24 }}>
+          <div className="banner-gem">✦</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:20, position:'relative' }}>
             <div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.goldLight, marginBottom:4 }}>Botanica Living Group (Pty) Ltd</div>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,0.5)', letterSpacing:'0.06em' }}>Reg: 2026/444834/07</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:26, color:T.goldBright, fontWeight:300, marginBottom:8, lineHeight:1.2 }}>
+                Botanica Living Group (Pty) Ltd
+              </div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.38)', letterSpacing:'0.1em', marginBottom:14 }}>
+                Registration No: 2026/444834/07
+              </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <span className="badge" style={{ background:'rgba(21,128,61,0.3)', color:'#6EE8A0', borderColor:'rgba(110,232,160,0.22)', fontSize:11 }}>
+                  ● In Business
+                </span>
+                <span className="badge" style={{ background:'rgba(184,151,90,0.22)', color:T.goldBright, borderColor:'rgba(232,192,122,0.25)', fontSize:11 }}>
+                  Name Change ✓
+                </span>
+                <span className="badge" style={{ background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.5)', borderColor:'rgba(255,255,255,0.1)', fontSize:11 }}>
+                  PWA Ready
+                </span>
+                <span className="badge" style={{
+                  background: importerStatus === 'Completed' ? 'rgba(21,128,61,0.3)' : 'rgba(184,151,90,0.18)',
+                  color: importerStatus === 'Completed' ? '#6EE8A0' : T.goldBright,
+                  borderColor: importerStatus === 'Completed' ? 'rgba(110,232,160,0.22)' : 'rgba(232,192,122,0.22)',
+                  fontSize: 11,
+                }}>
+                  {importerStatus === 'Completed' ? 'Importer ✓' : 'Importer Pending'}
+                </span>
+              </div>
             </div>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <span className="badge badge-green">In Business</span>
-              <span className="badge badge-gold">Name Change ✓</span>
-              <span className="badge" style={{ background:'rgba(184,151,90,0.2)', color:T.goldLight }}>PWA Ready</span>
+            {/* Overall health ring */}
+            <div style={{ textAlign:'center' }}>
+              <Ring score={healthScore} color={T.goldBright} size={92} strokeW={7} />
+              <div style={{ fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase', color:'rgba(255,255,255,0.28)', marginTop:8, fontWeight:600 }}>
+                Business Health
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Finance KPIs */}
-        <div className="section-label">Finance Summary</div>
-        <div className="grid-5 mb-20" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
-          {[
-            { label:'Owner Invested', val:ZAR(totalInvested), cls:'fin-kpi-inv', color:T.teal },
-            { label:'Business Income', val:ZAR(totalIncome),  cls:'fin-kpi-inc', color:T.green },
-            { label:'Total Expenses',  val:ZAR(totalExpenses),cls:'fin-kpi-exp', color:T.red },
-            { label:'Remaining Funds', val:ZAR(remaining),    cls:'fin-kpi-rem', color:T.gold },
-            { label:'Net Position',    val:ZAR(netPosition),  cls:'fin-kpi-net', color:T.forest },
-          ].map(k => (
-            <div className={`stat-card ${k.cls}`} key={k.label} style={{ cursor:'pointer' }} onClick={() => setPage('finance')}>
-              <div className="card-label">{k.label}</div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:k.color, lineHeight:1, marginTop:4 }}>{k.val}</div>
+        {/* ── KPI Cards ───────────────────────────────────────────────────── */}
+        <div className="grid-5 mb20" style={{ marginBottom:24 }}>
+          {kpiCards.map(k => (
+            <div key={k.label} className={`stat-card ${k.cls}`} onClick={() => setPage(k.page)}>
+              <div className="stat-top" style={{ background:`linear-gradient(90deg, ${k.color}88, ${k.color}22)` }} />
+              <div style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, background:k.chipBg, color:k.chipColor, fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:12 }}>
+                {k.chip}
+              </div>
+              <div className="stat-label">{k.label}</div>
+              <div className="stat-value" style={{ color:k.color }}>{k.value}</div>
+              {k.bar != null && (
+                <div className="pbar" style={{ marginTop:12 }}>
+                  <div className="pbar-fill" style={{ width:`${k.bar}%`, background:`linear-gradient(90deg, ${k.barColor}99, ${k.barColor})` }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
 
-        <div className="grid-3 gap-20 mb-20">
-          {/* Milestones */}
-          <div className="card">
-            <div className="section-label">Milestones</div>
-            {MILESTONES_COMPLETED.slice(-3).map((m, i) => (
-              <div className="milestone-row" key={i}>
-                <div className="milestone-icon milestone-done">✓</div>
-                <div>
-                  <div className="milestone-title">{m.label}</div>
-                  <div className="milestone-subtitle">Completed · {m.date}</div>
+        {/* ── Health Scores Row ────────────────────────────────────────────── */}
+        <div className="grid-3 mb20" style={{ marginBottom:24 }}>
+          {[
+            { label:'Business Health', score:healthScore, color:T.gold, desc:'Overall company readiness & progress' },
+            { label:'Project Progress', score:progressScore, color:T.forestGlow, desc:`${MILESTONES_COMPLETED.length} of ${totalMilestones} milestones complete` },
+            { label:'Finance Health', score:financeScore, color:T.teal, desc:'Capital position & income status' },
+          ].map(h => (
+            <div key={h.label} className="g-card" style={{ display:'flex', alignItems:'center', gap:18 }}>
+              <Ring score={h.score} color={h.color} size={74} strokeW={6} />
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:600, fontSize:13, color:T.forest, marginBottom:3 }}>{h.label}</div>
+                <div style={{ fontSize:11, color:T.textMid, marginBottom:10, lineHeight:1.5 }}>{h.desc}</div>
+                <div className="pbar">
+                  <div className="pbar-fill" style={{ width:`${h.score}%`, background:`linear-gradient(90deg,${h.color}88,${h.color})` }} />
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Middle Row ──────────────────────────────────────────────────── */}
+        <div className="grid-3 mb20" style={{ marginBottom:24 }}>
+
+          {/* Outstanding Actions */}
+          <div className="g-card g-card-click" onClick={() => setPage('actions')}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+              <div className="sec-label" style={{ marginBottom:0 }}>Outstanding Actions</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:32, color: critTasks > 0 ? T.danger : T.forest, lineHeight:1 }}>{openTasks}</div>
+            </div>
+            {critTasks > 0 && (
+              <div style={{ background:T.redPale, border:`1px solid rgba(185,28,28,0.15)`, borderRadius:8, padding:'8px 12px', marginBottom:14, fontSize:12, color:T.danger, fontWeight:600 }}>
+                ⚠ {critTasks} critical {critTasks === 1 ? 'task' : 'tasks'} need attention
+              </div>
+            )}
+            {tasks.filter(t => t.status !== 'Completed').slice(0, 4).map(t => (
+              <div key={t.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.3)` }}>
+                <span className={`badge ${t.priority === 'Critical' ? 'pri-critical' : t.priority === 'High' ? 'pri-high' : 'pri-medium'}`} style={{ fontSize:9, padding:'2px 7px', flexShrink:0 }}>{t.priority}</span>
+                <span style={{ fontSize:12, color:T.text, lineHeight:1.4 }}>{t.name}</span>
+              </div>
+            ))}
+            {openTasks === 0 && <div style={{ fontSize:13, color:T.textLight }}>All tasks complete ✓</div>}
+          </div>
+
+          {/* Key Milestones */}
+          <div className="g-card">
+            <div className="sec-label">Key Milestones</div>
+            {MILESTONES_COMPLETED.slice(-3).map((m, i) => (
+              <div className="milestone-row" key={`d${i}`}>
+                <div className="m-icon m-done">✓</div>
+                <div><div className="m-title">{m.label}</div><div className="m-sub">Completed · {m.date}</div></div>
               </div>
             ))}
             {MILESTONES_UPCOMING.slice(0, 3).map((m, i) => (
-              <div className="milestone-row" key={i}>
-                <div className={`milestone-icon ${m.status === 'In Progress' ? 'milestone-next' : 'milestone-future'}`}>
+              <div className="milestone-row" key={`u${i}`}>
+                <div className={`m-icon ${m.status === 'In Progress' ? 'm-prog' : 'm-future'}`}>
                   {m.status === 'In Progress' ? '◑' : '○'}
                 </div>
-                <div>
-                  <div className="milestone-title">{m.label}</div>
-                  <div className="milestone-subtitle">{m.status}</div>
-                </div>
+                <div><div className="m-title">{m.label}</div><div className="m-sub">{m.status}</div></div>
               </div>
             ))}
           </div>
 
-          {/* Action Centre summary */}
-          <div className="card" style={{ cursor:'pointer' }} onClick={() => setPage('actions')}>
-            <div className="section-label">Action Centre</div>
-            <div style={{ display:'flex', gap:12, marginBottom:16 }}>
-              <div style={{ textAlign:'center', flex:1, background:T.beige, borderRadius:8, padding:'12px 8px' }}>
-                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:T.forest }}>{openTasks}</div>
-                <div style={{ fontSize:10, color:T.textLight, letterSpacing:'0.1em', textTransform:'uppercase' }}>Open</div>
-              </div>
-              <div style={{ textAlign:'center', flex:1, background:'rgba(139,58,58,0.08)', borderRadius:8, padding:'12px 8px' }}>
-                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:T.danger }}>{criticalTasks}</div>
-                <div style={{ fontSize:10, color:T.textLight, letterSpacing:'0.1em', textTransform:'uppercase' }}>Critical</div>
-              </div>
+          {/* Documents + Expenses chart */}
+          <div className="g-card g-card-click" onClick={() => setPage('documents')}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+              <div className="sec-label" style={{ marginBottom:0 }}>Documents Stored</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:32, color:T.forest, lineHeight:1 }}>{documents.length}</div>
             </div>
-            {tasks.filter(t => t.status !== 'Completed').slice(0, 3).map(t => (
-              <div key={t.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 0', borderBottom:`1px solid ${T.beige}` }}>
-                <span className={`badge ${t.priority === 'Critical' ? 'pri-critical' : t.priority === 'High' ? 'pri-high' : 'pri-medium'}`} style={{ fontSize:9, padding:'2px 6px' }}>{t.priority}</span>
-                <span style={{ fontSize:12 }}>{t.name}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Documents */}
-          <div className="card" style={{ cursor:'pointer' }} onClick={() => setPage('documents')}>
-            <div className="section-label">Documents</div>
             {documents.length === 0 ? (
-              <div style={{ color:T.textLight, fontSize:13 }}>No documents uploaded yet. Click to add.</div>
+              <div style={{ color:T.textLight, fontSize:13, lineHeight:1.7 }}>
+                No documents yet.<br />
+                <span style={{ color:T.gold, fontSize:12, fontWeight:600 }}>Add CIPC, SARS, supplier docs →</span>
+              </div>
             ) : (
               documents.slice(0, 4).map(d => (
-                <div key={d.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${T.beige}` }}>
-                  <span style={{ fontSize:16 }}>📄</span>
+                <div key={d.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.3)` }}>
+                  <div style={{ width:26, height:26, borderRadius:6, background:`linear-gradient(135deg, rgba(184,151,90,0.2), rgba(184,151,90,0.08))`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, flexShrink:0 }}>📄</div>
                   <div>
-                    <div style={{ fontSize:12, fontWeight:500 }}>{d.name}</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:T.forest }}>{d.name}</div>
                     <div style={{ fontSize:10, color:T.textLight }}>{d.category} · {fmtDate(d.dateUploaded)}</div>
                   </div>
                 </div>
               ))
             )}
+            {expData.length > 0 && (
+              <div style={{ marginTop:16, paddingTop:14, borderTop:`1px solid rgba(210,200,184,0.3)` }}>
+                <div style={{ fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:T.textLight, fontWeight:600, marginBottom:8 }}>Recent Expenses</div>
+                <MiniChart data={expData} color={T.red} />
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid-2 gap-20">
+        {/* ── Bottom Row ──────────────────────────────────────────────────── */}
+        <div className="grid-2" style={{ gap:20 }}>
+
           {/* Suppliers & Products */}
-          <div className="card">
-            <div className="section-label">Suppliers & Products</div>
+          <div className="g-card">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <div className="sec-label" style={{ marginBottom:0 }}>Suppliers & Products</div>
+              <span style={{ fontSize:12, color:T.gold, cursor:'pointer', fontWeight:600 }} onClick={() => setPage('products')}>View all →</span>
+            </div>
             {suppliers.map(s => (
-              <div key={s.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0', borderBottom:`1px solid ${T.beige}` }}>
+              <div key={s.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid rgba(210,200,184,0.3)` }}>
                 <div>
-                  <div style={{ fontWeight:500, fontSize:13 }}>{s.name}</div>
-                  <div style={{ fontSize:11, color:T.textLight }}>{s.country} · {s.terms}</div>
+                  <div style={{ fontWeight:600, fontSize:13, color:T.forest }}>{s.name}</div>
+                  <div style={{ fontSize:11, color:T.textLight, marginTop:1 }}>{s.country} · {s.terms}</div>
                 </div>
-                <span className="badge badge-green">{s.status}</span>
+                <span className="badge badge-forest">{s.status}</span>
               </div>
             ))}
-            <div style={{ marginTop:12, padding:'9px 0', borderTop:`1px solid ${T.beige}` }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:T.textMid }}>
-                <span>{products.length} products · {foundersCount} in Founders Collection</span>
-                <span style={{ color:T.gold, cursor:'pointer' }} onClick={() => setPage('products')}>View →</span>
-              </div>
+            <div style={{ marginTop:12, padding:'10px 0', borderTop:`1px solid rgba(210,200,184,0.3)`, fontSize:12, color:T.textMid }}>
+              {products.length} products · {foundersCount} in Founders Collection
             </div>
           </div>
 
-          {/* Priorities */}
-          <div className="card">
-            <div className="section-label">Current Priorities</div>
+          {/* Current Priorities */}
+          <div className="g-card">
+            <div className="sec-label">Current Priorities</div>
             {[
-              { dot:'green', title:'Open bank account', desc:'Waiting on name change — unblock supplier payments.' },
-              { dot:'',      title:'Complete importer registration', desc:'SARS eFiling — required before first shipment.' },
-              { dot:'',      title:'Order Founders Collection samples', desc:'Confirm with Frank / Dongyi. Payment on hold.' },
-              { dot:'green', title:'Build Checkers Hyper pitch deck', desc:'Financial model + shop-in-shop concept + pilot proposal.' },
-              { dot:'',      title:'Finalise Checkers Hyper pricing', desc:'Present sell-in and RRP matrix to buyer.' },
+              { green:false, title:'Open business bank account',            desc:'Unblocks supplier payments. Waiting on name change documents.' },
+              { green:false, title:'Complete importer registration',         desc:'SARS eFiling — required before first shipment can clear customs.' },
+              { green:false, title:'Order Founders Collection samples',      desc:'Confirm with Frank / Dongyi. 6 hero SKUs selected and ready.' },
+              { green:true,  title:'Build Checkers Hyper pitch deck',        desc:'Financial model + shop-in-shop visual concept + pilot proposal.' },
+              { green:true,  title:'Finalise import calculator assumptions',  desc:'Align duty % and exchange rate with clearing agent.' },
             ].map((p, i) => (
               <div className="priority-item" key={i}>
-                <div className={`priority-dot ${p.dot}`} />
+                <div className={`p-dot ${p.green ? 'p-dot-green' : 'p-dot-gold'}`} />
                 <div>
-                  <div className="priority-title">{p.title}</div>
-                  <div className="priority-desc">{p.desc}</div>
+                  <div className="p-title">{p.title}</div>
+                  <div className="p-desc">{p.desc}</div>
                 </div>
               </div>
             ))}

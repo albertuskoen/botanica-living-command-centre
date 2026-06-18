@@ -1,7 +1,7 @@
 {
-  "name": "botanica-living",
+  "name": "botanica-living-group",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,6 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.2",
-    "vite-plugin-pwa": "^0.20.0",
-    "workbox-window": "^7.0.0"
+    "vite-plugin-pwa": "^0.20.0"
   }
 }
