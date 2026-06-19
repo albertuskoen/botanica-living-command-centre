@@ -13,9 +13,9 @@ const TYPE_COLORS = {
   'Business Expense': T.red,
 }
 const TYPE_BG = {
-  'Owner Investment': T.tealLight,
-  'Business Income':  T.greenLight,
-  'Business Expense': T.redLight,
+  'Owner Investment': T.tealPale,
+  'Business Income':  T.greenPale,
+  'Business Expense': T.redPale,
 }
 const BLANK_TXN = {
   date: today(), type: 'Business Expense', category: 'Other Expense',
@@ -726,7 +726,7 @@ export default function FinanceCentre({ finance, setFinance }) {
           </div>
           <div className="form-field">
             <label>Amount (ZAR)</label>
-            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.amount} onChange={F('amount')} />
+            <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={F('amount')} />
           </div>
           <div className="form-field full">
             <label>Description</label>
@@ -740,7 +740,7 @@ export default function FinanceCentre({ finance, setFinance }) {
             </select>
           </div>
           <div className="form-field"><label>Invoice Number (optional)</label><input value={form.invoiceNumber || ''} onChange={F('invoiceNumber')} placeholder="INV-001" /></div>
-          <div className="form-field"><label>VAT Amount (optional)</label><input type="number" min="0" step="0.01" value={form.vatAmount || ''} onChange={F('vatAmount')} placeholder="0.00" /></div>
+          <div className="form-field"><label>VAT Amount (optional)</label><input type="text" inputMode="decimal" value={form.vatAmount || ''} onChange={F('vatAmount')} placeholder="0.00" /></div>
           <div className="form-field full"><label>Notes</label><textarea value={form.notes} onChange={F('notes')} /></div>
         </div>
       </Modal>
@@ -945,11 +945,11 @@ export default function FinanceCentre({ finance, setFinance }) {
               </div>
               <div className="form-field">
                 <label>Amount (ZAR)</label>
-                <input type="number" min="0" step="0.01" value={singleForm.amount} onChange={SF('amount')} />
+                <input type="text" inputMode="decimal" value={singleForm.amount} onChange={SF('amount')} />
               </div>
               <div className="form-field">
                 <label>VAT Amount (ZAR)</label>
-                <input type="number" min="0" step="0.01" value={singleForm.vatAmount || ''} onChange={SF('vatAmount')} placeholder="0.00" />
+                <input type="text" inputMode="decimal" value={singleForm.vatAmount || ''} onChange={SF('vatAmount')} placeholder="0.00" />
               </div>
               <div className="form-field">
                 <label>Invoice Number</label>

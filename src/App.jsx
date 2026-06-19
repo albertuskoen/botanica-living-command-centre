@@ -45,7 +45,7 @@ export default function App() {
           {page === 'progress'   && <BusinessProgress  progress={progress}   setProgress={setProgress} />}
           {page === 'finance'    && <FinanceCentre      finance={finance}     setFinance={setFinance} />}
           {page === 'actions'    && <ActionCentre       tasks={tasks}         setTasks={setTasks} />}
-          {page === 'documents'  && <BusinessDocuments  documents={documents} setDocuments={setDocuments} />}
+          {page === 'documents'  && <BusinessDocuments  documents={documents} setDocuments={setDocuments} finance={finance} />}
           {page === 'suppliers'  && <Suppliers          suppliers={suppliers} setSuppliers={setSuppliers} />}
           {page === 'products'   && <Products           products={products}   setProducts={setProducts} suppliers={suppliers} />}
           {page === 'calculator' && <Calculator />}

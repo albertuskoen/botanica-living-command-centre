@@ -75,12 +75,12 @@ export default function Products({ products, setProducts, suppliers }) {
           <div className="form-field"><label>Supplier</label><select value={form.supplier} onChange={F('supplier')}>{suppliers.map(s => <option key={s.id}>{s.name}</option>)}</select></div>
           <div className="form-field"><label>SKU</label><input value={form.sku} onChange={F('sku')} /></div>
           <div className="form-field"><label>Height</label><input value={form.height} onChange={F('height')} /></div>
-          <div className="form-field"><label>MOQ</label><input type="number" value={form.moq} onChange={F('moq')} /></div>
+          <div className="form-field"><label>MOQ</label><input type="text" inputMode="decimal" value={form.moq} onChange={F('moq')} /></div>
           <div className="form-field"><label>Lead Time</label><input value={form.leadTime} onChange={F('leadTime')} /></div>
-          <div className="form-field"><label>EXW (USD)</label><input type="number" value={form.exwPrice} onChange={F('exwPrice')} /></div>
-          <div className="form-field"><label>FOB (USD)</label><input type="number" value={form.fobPrice} onChange={F('fobPrice')} /></div>
-          <div className="form-field"><label>CIF (USD)</label><input type="number" value={form.cifPrice} onChange={F('cifPrice')} /></div>
-          <div className="form-field"><label>Sample Cost (USD)</label><input type="number" value={form.sampleCost} onChange={F('sampleCost')} /></div>
+          <div className="form-field"><label>EXW (USD)</label><input type="text" inputMode="decimal" value={form.exwPrice} onChange={F('exwPrice')} /></div>
+          <div className="form-field"><label>FOB (USD)</label><input type="text" inputMode="decimal" value={form.fobPrice} onChange={F('fobPrice')} /></div>
+          <div className="form-field"><label>CIF (USD)</label><input type="text" inputMode="decimal" value={form.cifPrice} onChange={F('cifPrice')} /></div>
+          <div className="form-field"><label>Sample Cost (USD)</label><input type="text" inputMode="decimal" value={form.sampleCost} onChange={F('sampleCost')} /></div>
           <div className="form-field"><label>Sample Status</label><select value={form.sampleStatus} onChange={F('sampleStatus')}><option>Pending</option><option>Ordered</option><option>Received</option></select></div>
           <div className="form-field"><label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}><input type="checkbox" checked={form.assembly} onChange={F('assembly')} style={{ width:16, height:16 }} /> Assembly Required</label></div>
           <div className="form-field"><label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}><input type="checkbox" checked={form.foundersCollection} onChange={F('foundersCollection')} style={{ width:16, height:16 }} /> Founders Collection</label></div>
