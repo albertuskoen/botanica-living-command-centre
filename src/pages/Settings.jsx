@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import LayoutHealth from '../components/LayoutHealth.jsx'
 import { T } from '../utils/tokens.js'
 import { today } from '../utils/format.js'
 
@@ -607,6 +608,8 @@ export default function Settings({ allData, onRestore }) {
             ⚠ Download a backup before clearing. Once cleared, your data cannot be recovered.
           </div>
         </div>
+
+      <LayoutHealth />
 
       </div>
     </div>
