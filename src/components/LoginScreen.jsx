@@ -1,395 +1,408 @@
-// src/components/LoginScreen.jsx
-// App-level login gate — shown before any page content.
-// Handles: first-time PIN setup · PIN login · TOTP 2FA · Trusted device · Setup wizard
+// src/components/LoginScreen.jsx — v2.1
+// Fixed:
+//   • Single password input for PIN (no multi-box — works on Samsung tablet)
+//   • 2FA is fully optional — "Skip, enter app now" always available
+//   • TOTP setup shows QR + raw URI + manual setup key + copy button
+//   • Step flow is linear and unambiguous: setup_pin → (optional) setup_totp → app
+//   • TOTP verify at login uses a single text input (not broken multi-box)
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { T } from '../utils/tokens.js'
 import {
   hasPIN, setPIN, verifyPIN,
-  getTOTPConfig, saveTOTPConfig, generateTOTPSecret, getTOTPQRUrl, verifyTOTP,
+  getTOTPConfig, saveTOTPConfig, generateTOTPSecret, getTOTPQRUrl, getTOTPUri, verifyTOTP,
   isDeviceTrusted, trustDevice,
-  createSession, getAuthConfig, saveAuthConfig,
+  createSession, saveAuthConfig,
 } from '../lib/auth.js'
 
-const LOGO_STYLE = {
-  fontFamily: "'Cormorant Garamond', serif",
-  fontSize: 28, fontWeight: 600, color: T.goldBright, letterSpacing: '0.04em',
-}
-const SUBTITLE_STYLE = {
-  fontSize: 11, color: 'rgba(232,192,122,0.6)', letterSpacing: '0.18em',
-  textTransform: 'uppercase', marginTop: 4,
-}
-const CARD_STYLE = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(232,192,122,0.15)',
-  borderRadius: 16, padding: '32px 36px', width: '100%', maxWidth: 380,
-}
-const INPUT_STYLE = {
-  width: '100%', boxSizing: 'border-box', padding: '12px 14px',
-  borderRadius: 10, border: '1px solid rgba(232,192,122,0.25)',
-  background: 'rgba(255,255,255,0.06)', color: T.goldBright,
-  fontSize: 15, letterSpacing: 2, outline: 'none', marginTop: 6,
-  fontFamily: "'Inter', sans-serif",
-}
-const BTN_PRIMARY = {
-  width: '100%', padding: '13px', borderRadius: 10, border: 'none',
-  background: 'linear-gradient(135deg,#B8975A,#CFA96E)', color: T.forest,
-  fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 12,
-  letterSpacing: '0.05em',
-}
-const BTN_GHOST = {
-  background: 'none', border: 'none', color: 'rgba(232,192,122,0.6)',
-  fontSize: 12, cursor: 'pointer', padding: '4px 0', textDecoration: 'underline',
-}
-const ERR_STYLE = {
-  color: '#F87171', fontSize: 12, marginTop: 8, textAlign: 'center',
-}
-const LABEL_STYLE = {
-  color: 'rgba(232,192,122,0.7)', fontSize: 12, letterSpacing: '0.12em',
-  textTransform: 'uppercase', display: 'block', marginBottom: 2, marginTop: 16,
+// ── Styles ────────────────────────────────────────────────────────────────────
+const S = {
+  logo:  { fontFamily:"'Cormorant Garamond',serif", fontSize:28, fontWeight:600, color:'#E8C07A', letterSpacing:'0.04em' },
+  sub:   { fontSize:11, color:'rgba(232,192,122,0.55)', letterSpacing:'0.18em', textTransform:'uppercase', marginTop:4 },
+  card:  { background:'rgba(255,255,255,0.06)', border:'1px solid rgba(232,192,122,0.15)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:400, boxSizing:'border-box' },
+  label: { color:'rgba(232,192,122,0.7)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:4, marginTop:18 },
+  input: { width:'100%', boxSizing:'border-box', padding:'13px 14px', borderRadius:10, border:'1px solid rgba(232,192,122,0.3)', background:'rgba(255,255,255,0.07)', color:'#E8C07A', fontSize:16, outline:'none', marginTop:2, fontFamily:"'Inter',sans-serif", WebkitAppearance:'none' },
+  btn:   { width:'100%', padding:'14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#B8975A,#CFA96E)', color:'#0F2318', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:14, letterSpacing:'0.04em' },
+  ghost: { background:'none', border:'none', color:'rgba(232,192,122,0.55)', fontSize:12, cursor:'pointer', padding:'6px 0', textDecoration:'underline' },
+  err:   { color:'#F87171', fontSize:12, marginTop:10, textAlign:'center', lineHeight:1.5 },
+  ok:    { color:'#86EFAC', fontSize:12, marginTop:10, textAlign:'center' },
 }
 
-// ── OTP digit input ────────────────────────────────────────────────────────────
-function OTPInput({ value, onChange, length = 6 }) {
-  const refs = Array.from({ length }, () => useRef(null)) // eslint-disable-line react-hooks/rules-of-hooks
-  const digits = value.split('').concat(Array(length).fill('')).slice(0, length)
-
-  const handleKey = (i, e) => {
-    if (e.key === 'Backspace') {
-      const next = value.slice(0, -1)
-      onChange(next)
-      if (i > 0) refs[i - 1].current?.focus()
-      return
-    }
-    if (!/^\d$/.test(e.key)) return
-    const next = (value + e.key).slice(0, length)
-    onChange(next)
-    if (i < length - 1) refs[i + 1].current?.focus()
-  }
-
+// ── Shared wrapper ─────────────────────────────────────────────────────────────
+function Wrap({ children }) {
   return (
-    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
-      {digits.map((d, i) => (
-        <input
-          key={i}
-          ref={refs[i]}
-          type="text"
-          inputMode="numeric"
-          maxLength={1}
-          value={d}
-          readOnly
-          onKeyDown={e => handleKey(i, e)}
-          onClick={() => refs[i].current?.focus()}
-          style={{
-            width: 42, height: 52, textAlign: 'center', fontSize: 22,
-            borderRadius: 10, border: `1.5px solid ${d ? 'rgba(184,151,90,0.7)' : 'rgba(232,192,122,0.2)'}`,
-            background: 'rgba(255,255,255,0.06)', color: T.goldBright, outline: 'none',
-            cursor: 'text', caretColor: 'transparent',
-          }}
-        />
-      ))}
+    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0F2318 0%,#1A3828 60%,#102820 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
+      <div style={{ textAlign:'center', marginBottom:28 }}>
+        <div style={S.logo}>Botanica Living</div>
+        <div style={S.sub}>Group Command Centre</div>
+      </div>
+      <div style={S.card}>{children}</div>
     </div>
+  )
+}
+
+// ── Heading ───────────────────────────────────────────────────────────────────
+function H({ title, sub }) {
+  return (
+    <div style={{ marginBottom:20 }}>
+      <div style={{ color:'#E8C07A', fontSize:18, fontWeight:600, marginBottom:4 }}>{title}</div>
+      {sub && <div style={{ color:'rgba(232,192,122,0.55)', fontSize:12, lineHeight:1.65 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ── Copy button ───────────────────────────────────────────────────────────────
+function CopyBtn({ text, label = 'Copy' }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }).catch(() => {})
+  }
+  return (
+    <button
+      onClick={copy}
+      style={{ background:'rgba(184,151,90,0.15)', border:'1px solid rgba(184,151,90,0.3)', borderRadius:7, color:'#E8C07A', fontSize:11, padding:'5px 12px', cursor:'pointer', flexShrink:0 }}
+    >
+      {copied ? '✓ Copied' : label}
+    </button>
   )
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function LoginScreen({ onAuthenticated }) {
-  const [step,        setStep]        = useState(null)   // null=loading | 'login' | 'setup_pin' | 'setup_totp' | 'totp'
-  const [pin,         setPin]         = useState('')
-  const [pinConfirm,  setPinConfirm]  = useState('')
-  const [totp,        setTotp]        = useState('')
-  const [error,       setError]       = useState('')
-  const [working,     setWorking]     = useState(false)
-  const [remember,    setRemember]    = useState(false)
-  const [totpSecret,  setTotpSecret]  = useState('')
-  const [totpSetupCode, setTotpSetupCode] = useState('')
-  const [showTotp,    setShowTotp]    = useState(false)  // toggle TOTP in setup
+  // Steps: null (loading) | setup_pin | setup_totp | login | totp
+  const [step,          setStep]          = useState(null)
+  const [pin,           setPin]           = useState('')
+  const [pinConfirm,    setPinConfirm]    = useState('')
+  const [totpCode,      setTotpCode]      = useState('')    // code entered by user
+  const [totpSecret,    setTotpSecret]    = useState('')    // generated secret for setup
+  const [error,         setError]         = useState('')
+  const [working,       setWorking]       = useState(false)
+  const [remember,      setRemember]      = useState(false)
+  const [qrFailed,      setQrFailed]      = useState(false)
 
-  // On mount — determine which screen to show
+  const pinRef     = useRef(null)
+  const confirmRef = useRef(null)
+  const totpRef    = useRef(null)
+
+  // Determine initial step
   useEffect(() => {
-    if (!hasPIN()) {
-      setStep('setup_pin')
-    } else {
-      setStep('login')
-    }
+    setStep(hasPIN() ? 'login' : 'setup_pin')
   }, [])
 
-  // ── First-time PIN setup ───────────────────────────────────────────────────
-  const handleSetupPIN = useCallback(async () => {
-    if (pin.length < 4)              { setError('PIN must be at least 4 characters.'); return }
-    if (pin !== pinConfirm)           { setError('PINs do not match.'); return }
-    setWorking(true); setError('')
-    try {
-      await setPIN(pin)
-      // If TOTP was enabled in setup, go to TOTP verification setup
-      if (showTotp && totpSecret) {
-        setStep('setup_totp_verify')
-      } else {
-        // Done — create session
-        saveAuthConfig({ setupComplete: true, inactivityMinutes: 30 })
-        createSession()
-        onAuthenticated()
-      }
-    } catch (e) { setError(e.message) }
-    setWorking(false)
-  }, [pin, pinConfirm, showTotp, totpSecret, onAuthenticated])
+  // Auto-focus on step change
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (step === 'login')      pinRef.current?.focus()
+      if (step === 'setup_pin')  pinRef.current?.focus()
+      if (step === 'totp')       totpRef.current?.focus()
+      if (step === 'setup_totp') totpRef.current?.focus()
+    }, 80)
+    return () => clearTimeout(t)
+  }, [step])
 
-  // ── TOTP setup: generate secret and QR ────────────────────────────────────
-  const handleEnableTotp = useCallback(() => {
-    const secret = generateTOTPSecret()
-    setTotpSecret(secret)
-    setTotpSetupCode('')
-    setStep('setup_totp')
-  }, [])
+  const clear = () => { setError(''); }
 
-  const handleVerifyTotpSetup = useCallback(async () => {
-    if (totpSetupCode.length !== 6) { setError('Enter the 6-digit code from your authenticator app.'); return }
-    setWorking(true); setError('')
-    const valid = await verifyTOTP(totpSecret, totpSetupCode)
-    if (!valid) { setError('Code incorrect. Ensure your device time is correct and try again.'); setWorking(false); return }
-    saveTOTPConfig(totpSecret, true)
+  // ── Enter app (after successful auth) ─────────────────────────────────────
+  const enterApp = useCallback((trustThisDevice = false) => {
     saveAuthConfig({ setupComplete: true, inactivityMinutes: 30 })
     createSession()
+    if (trustThisDevice) trustDevice()
     onAuthenticated()
-    setWorking(false)
-  }, [totpSecret, totpSetupCode, onAuthenticated])
+  }, [onAuthenticated])
 
-  // ── Login with PIN ─────────────────────────────────────────────────────────
+  // ── Skip 2FA (always available) ────────────────────────────────────────────
+  const skip2FA = useCallback(() => {
+    saveTOTPConfig('', false)
+    enterApp(remember)
+  }, [enterApp, remember])
+
+  // ── Step 1: Create PIN ─────────────────────────────────────────────────────
+  const handleSetupPIN = useCallback(async () => {
+    if (pin.length < 4)   { setError('PIN must be at least 4 characters.'); return }
+    if (pin !== pinConfirm) { setError('PINs do not match. Try again.'); return }
+    setWorking(true); clear()
+    try {
+      await setPIN(pin)
+      // Generate a secret ready for 2FA setup screen
+      const secret = generateTOTPSecret()
+      setTotpSecret(secret)
+      setTotpCode('')
+      setQrFailed(false)
+      setStep('setup_totp')
+    } catch (e) { setError(e.message) }
+    setWorking(false)
+  }, [pin, pinConfirm])
+
+  // ── Step 2: Verify TOTP setup ──────────────────────────────────────────────
+  const handleVerifyTOTPSetup = useCallback(async () => {
+    const code = totpCode.replace(/\s/g, '')
+    if (code.length !== 6) { setError('Enter the 6-digit code from your authenticator app.'); return }
+    setWorking(true); clear()
+    const valid = await verifyTOTP(totpSecret, code)
+    if (!valid) {
+      setError('Code not valid. Check your device time is correct and try again. Or tap "Skip 2FA" to enter now.')
+      setWorking(false); return
+    }
+    saveTOTPConfig(totpSecret, true)
+    enterApp(remember)
+    setWorking(false)
+  }, [totpCode, totpSecret, enterApp, remember])
+
+  // ── Login: verify PIN ──────────────────────────────────────────────────────
   const handleLogin = useCallback(async () => {
     if (!pin) { setError('Enter your PIN.'); return }
-    setWorking(true); setError('')
+    setWorking(true); clear()
     try {
       const ok = await verifyPIN(pin)
       if (!ok) { setError('Incorrect PIN.'); setWorking(false); return }
-
-      const totp2fa = getTOTPConfig()
-      if (totp2fa.enabled && !isDeviceTrusted()) {
-        // Need TOTP — move to second factor step
+      const cfg = getTOTPConfig()
+      if (cfg.enabled && !isDeviceTrusted()) {
+        setTotpCode('')
         setWorking(false)
         setStep('totp')
         return
       }
-
-      // PIN correct + no 2FA needed (trusted device or 2FA not configured)
-      createSession()
-      if (remember) trustDevice()
-      onAuthenticated()
+      enterApp(remember)
     } catch (e) { setError(e.message) }
     setWorking(false)
-  }, [pin, remember, onAuthenticated])
+  }, [pin, remember, enterApp])
 
-  // ── Verify TOTP at login ───────────────────────────────────────────────────
-  const handleTOTP = useCallback(async () => {
-    if (totp.length !== 6) { setError('Enter the 6-digit code.'); return }
-    setWorking(true); setError('')
+  // ── Login: verify TOTP ────────────────────────────────────────────────────
+  const handleLoginTOTP = useCallback(async () => {
+    const code = totpCode.replace(/\s/g, '')
+    if (code.length !== 6) { setError('Enter the 6-digit code.'); return }
+    setWorking(true); clear()
     const { secret } = getTOTPConfig()
-    const valid = await verifyTOTP(secret, totp)
+    const valid = await verifyTOTP(secret, code)
     if (!valid) { setError('Code incorrect or expired. Try again.'); setWorking(false); return }
-    createSession()
-    if (remember) trustDevice()
-    onAuthenticated()
+    enterApp(remember)
     setWorking(false)
-  }, [totp, remember, onAuthenticated])
+  }, [totpCode, remember, enterApp])
 
-  // ── Shared layout ──────────────────────────────────────────────────────────
-  const Wrapper = ({ children }) => (
-    <div style={{
-      minHeight: '100vh', background: `linear-gradient(145deg, ${T.forest} 0%, ${T.forestMid} 60%, #102820 100%)`,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '24px 16px', fontFamily: "'Inter', sans-serif",
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={LOGO_STYLE}>Botanica Living</div>
-        <div style={SUBTITLE_STYLE}>Group Command Centre</div>
-      </div>
-      <div style={CARD_STYLE}>{children}</div>
-    </div>
-  )
+  // ── Forgot PIN ─────────────────────────────────────────────────────────────
+  const handleForgotPIN = () => {
+    if (!window.confirm(
+      'Reset your PIN?\n\n' +
+      'WARNING: All locally stored app data will be cleared on this device for security.\n' +
+      'Your Supabase data (transactions, documents) is NOT affected and will reload after login.\n\n' +
+      'Continue?'
+    )) return
+    localStorage.removeItem('bl_auth_pin')
+    localStorage.removeItem('bl_auth_totp')
+    localStorage.removeItem('bl_auth_trusted')
+    const KEEP = ['bl_auth_config', 'bl_device_id']
+    for (const key of Object.keys(localStorage)) {
+      if (!KEEP.includes(key) && key.startsWith('bl_')) localStorage.removeItem(key)
+    }
+    sessionStorage.removeItem('bl_session')
+    setPin(''); setPinConfirm(''); setError(''); setStep('setup_pin')
+  }
 
-  if (step === null) return <Wrapper><div style={{ color: T.goldBright, textAlign: 'center', padding: 20 }}>Loading…</div></Wrapper>
+  // ─────────────────────────────────────────────────────────────────────────
+  if (step === null) return <Wrap><div style={{ color:'#E8C07A', textAlign:'center', padding:20 }}>Loading…</div></Wrap>
 
-  // ── Setup PIN ──────────────────────────────────────────────────────────────
+  // ── SETUP: Create PIN ─────────────────────────────────────────────────────
   if (step === 'setup_pin') return (
-    <Wrapper>
-      <div style={{ color: T.goldBright, fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Set Up Your PIN</div>
-      <div style={{ color: 'rgba(232,192,122,0.55)', fontSize: 12, lineHeight: 1.6, marginBottom: 20 }}>
-        Create a PIN to protect access to this app. Minimum 4 characters — digits, letters, or symbols.
-      </div>
+    <Wrap>
+      <H title="Create Your PIN" sub="Set a PIN to protect access. Minimum 4 characters — letters, digits or symbols." />
 
-      <label style={LABEL_STYLE}>Create PIN</label>
+      <label style={S.label}>New PIN</label>
       <input
+        ref={pinRef}
         type="password"
+        inputMode="numeric"
         placeholder="Enter PIN"
         value={pin}
-        onChange={e => { setPin(e.target.value); setError('') }}
-        style={INPUT_STYLE}
         autoComplete="new-password"
-        onKeyDown={e => e.key === 'Enter' && (pinConfirm ? handleSetupPIN() : null)}
+        onChange={e => { setPin(e.target.value); clear() }}
+        onKeyDown={e => e.key === 'Enter' && confirmRef.current?.focus()}
+        style={S.input}
       />
-      <label style={LABEL_STYLE}>Confirm PIN</label>
+
+      <label style={S.label}>Confirm PIN</label>
       <input
+        ref={confirmRef}
         type="password"
+        inputMode="numeric"
         placeholder="Re-enter PIN"
         value={pinConfirm}
-        onChange={e => { setPinConfirm(e.target.value); setError('') }}
-        style={INPUT_STYLE}
         autoComplete="new-password"
+        onChange={e => { setPinConfirm(e.target.value); clear() }}
         onKeyDown={e => e.key === 'Enter' && handleSetupPIN()}
+        style={S.input}
       />
 
-      {/* Optional TOTP setup */}
-      <div style={{ marginTop: 20, padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(232,192,122,0.12)', background: 'rgba(255,255,255,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input
-            type="checkbox"
-            id="totp-opt"
-            checked={showTotp}
-            onChange={e => {
-              setShowTotp(e.target.checked)
-              if (e.target.checked && !totpSecret) {
-                const s = generateTOTPSecret(); setTotpSecret(s)
-              }
-            }}
-            style={{ accentColor: T.gold, width: 16, height: 16 }}
-          />
-          <label htmlFor="totp-opt" style={{ color: 'rgba(232,192,122,0.8)', fontSize: 13, cursor: 'pointer' }}>
-            Enable 2FA (Google Authenticator / Authy)
-          </label>
-        </div>
-        {showTotp && totpSecret && (
-          <div style={{ marginTop: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'rgba(232,192,122,0.5)', marginBottom: 8 }}>
-              Scan with your authenticator app, then continue:
-            </div>
+      {error && <div style={S.err}>⚠ {error}</div>}
+
+      <button style={S.btn} onClick={handleSetupPIN} disabled={working || pin.length < 4}>
+        {working ? 'Setting up…' : 'Create PIN & Continue →'}
+      </button>
+
+      <div style={{ marginTop:14, fontSize:11, color:'rgba(232,192,122,0.45)', textAlign:'center', lineHeight:1.5 }}>
+        Next step: optional 2FA setup. You can skip 2FA and enter the app immediately.
+      </div>
+    </Wrap>
+  )
+
+  // ── SETUP: 2FA (optional) ─────────────────────────────────────────────────
+  if (step === 'setup_totp') {
+    const qrUrl     = getTOTPQRUrl(totpSecret, 'BotanicaLiving')
+    const manualUri = getTOTPUri(totpSecret, 'BotanicaLiving')
+
+    return (
+      <Wrap>
+        <H title="Set Up 2FA (Optional)" sub="Scan the QR code with Google Authenticator, Authy, or any TOTP app. You can skip this and add 2FA later in Settings." />
+
+        {/* QR code */}
+        <div style={{ textAlign:'center', marginBottom:16 }}>
+          {!qrFailed ? (
             <img
-              src={getTOTPQRUrl(totpSecret)}
-              alt="QR code"
-              style={{ width: 160, height: 160, borderRadius: 8, background: '#fff', padding: 4 }}
+              src={qrUrl}
+              alt="2FA QR code"
+              style={{ width:180, height:180, borderRadius:10, background:'#fff', padding:6, display:'block', margin:'0 auto 10px' }}
+              onError={() => setQrFailed(true)}
             />
-            <div style={{ fontSize: 10, color: 'rgba(232,192,122,0.4)', marginTop: 6, wordBreak: 'break-all', fontFamily: 'monospace' }}>
-              {totpSecret}
+          ) : (
+            <div style={{ padding:'16px 12px', background:'rgba(185,28,28,0.12)', border:'1px solid rgba(185,28,28,0.25)', borderRadius:10, marginBottom:10, fontSize:12, color:'#F87171' }}>
+              QR image failed to load. Use the manual key below.
             </div>
+          )}
+          <div style={{ fontSize:11, color:'rgba(232,192,122,0.5)', marginBottom:6 }}>
+            Can't scan? Add manually in your authenticator app:
           </div>
-        )}
-      </div>
+        </div>
 
-      {error && <div style={ERR_STYLE}>⚠ {error}</div>}
-      <button style={BTN_PRIMARY} onClick={handleSetupPIN} disabled={working}>
-        {working ? 'Setting up…' : showTotp ? 'Continue to 2FA →' : 'Create PIN & Enter App'}
-      </button>
-    </Wrapper>
-  )
+        {/* Manual setup key */}
+        <div style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(232,192,122,0.2)', borderRadius:8, padding:'10px 12px', marginBottom:12 }}>
+          <div style={{ fontSize:10, color:'rgba(232,192,122,0.5)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:6 }}>Manual setup key</div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <code style={{ fontSize:13, color:'#E8C07A', letterSpacing:'0.1em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.6 }}>
+              {totpSecret.match(/.{1,4}/g)?.join(' ')}
+            </code>
+            <CopyBtn text={totpSecret} label="Copy key" />
+          </div>
+        </div>
 
-  // ── Verify TOTP during setup ───────────────────────────────────────────────
-  if (step === 'setup_totp') return (
-    <Wrapper>
-      <div style={{ color: T.goldBright, fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Verify Authenticator App</div>
-      <div style={{ color: 'rgba(232,192,122,0.55)', fontSize: 12, lineHeight: 1.6, marginBottom: 20 }}>
-        Enter the 6-digit code shown in your authenticator app to confirm 2FA is working correctly.
-      </div>
-      <OTPInput value={totpSetupCode} onChange={setTotpSetupCode} />
-      {error && <div style={ERR_STYLE}>⚠ {error}</div>}
-      <button style={BTN_PRIMARY} onClick={handleVerifyTotpSetup} disabled={working || totpSetupCode.length !== 6}>
-        {working ? 'Verifying…' : 'Confirm & Enter App'}
-      </button>
-      <div style={{ textAlign: 'center', marginTop: 10 }}>
-        <button style={BTN_GHOST} onClick={() => { saveTOTPConfig('', false); saveAuthConfig({ setupComplete: true, inactivityMinutes: 30 }); createSession(); onAuthenticated() }}>
-          Skip 2FA for now
+        {/* Full URI (for advanced users / import) */}
+        <details style={{ marginBottom:12 }}>
+          <summary style={{ fontSize:11, color:'rgba(232,192,122,0.4)', cursor:'pointer', userSelect:'none' }}>Show full otpauth:// URI</summary>
+          <div style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:6 }}>
+            <code style={{ fontSize:10, color:'rgba(232,192,122,0.5)', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.6 }}>{manualUri}</code>
+            <CopyBtn text={manualUri} label="Copy" />
+          </div>
+        </details>
+
+        {/* Verification code entry */}
+        <label style={S.label}>Enter 6-digit code to verify setup</label>
+        <input
+          ref={totpRef}
+          type="text"
+          inputMode="numeric"
+          placeholder="000000"
+          value={totpCode}
+          maxLength={7}
+          autoComplete="one-time-code"
+          onChange={e => { setTotpCode(e.target.value.replace(/\D/g,'')); clear() }}
+          onKeyDown={e => e.key === 'Enter' && handleVerifyTOTPSetup()}
+          style={{ ...S.input, textAlign:'center', letterSpacing:'0.3em', fontSize:20 }}
+        />
+
+        {/* Trusted device */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
+          <input type="checkbox" id="trust-s" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
+          <label htmlFor="trust-s" style={{ color:'rgba(232,192,122,0.65)', fontSize:12, cursor:'pointer' }}>Trust this device (skip 2FA here)</label>
+        </div>
+
+        {error && <div style={S.err}>⚠ {error}</div>}
+
+        <button
+          style={S.btn}
+          onClick={handleVerifyTOTPSetup}
+          disabled={working || totpCode.replace(/\D/g,'').length !== 6}
+        >
+          {working ? 'Verifying…' : 'Verify & Enable 2FA'}
         </button>
-      </div>
-    </Wrapper>
-  )
 
-  // ── Login with PIN ─────────────────────────────────────────────────────────
+        {/* Always-visible skip */}
+        <button style={{ ...S.btn, background:'rgba(232,192,122,0.1)', color:'#E8C07A', border:'1px solid rgba(232,192,122,0.25)', marginTop:8 }} onClick={skip2FA}>
+          Skip 2FA — Enter App Now
+        </button>
+
+        <div style={{ marginTop:10, fontSize:11, color:'rgba(232,192,122,0.4)', textAlign:'center', lineHeight:1.5 }}>
+          You can enable 2FA later from Settings → Security.
+        </div>
+      </Wrap>
+    )
+  }
+
+  // ── LOGIN: PIN ────────────────────────────────────────────────────────────
   if (step === 'login') return (
-    <Wrapper>
-      <div style={{ color: T.goldBright, fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Welcome Back</div>
-      <div style={{ color: 'rgba(232,192,122,0.55)', fontSize: 12, marginBottom: 24 }}>
-        Enter your PIN to access the Command Centre.
-      </div>
+    <Wrap>
+      <H title="Welcome Back" sub="Enter your PIN to access the Command Centre." />
 
-      <label style={LABEL_STYLE}>PIN</label>
+      <label style={S.label}>PIN</label>
       <input
+        ref={pinRef}
         type="password"
+        inputMode="numeric"
         placeholder="Enter PIN"
         value={pin}
-        autoFocus
-        onChange={e => { setPin(e.target.value); setError('') }}
-        style={INPUT_STYLE}
         autoComplete="current-password"
+        onChange={e => { setPin(e.target.value); clear() }}
         onKeyDown={e => e.key === 'Enter' && handleLogin()}
+        style={S.input}
       />
 
-      {/* Trusted device option */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
-        <input
-          type="checkbox"
-          id="trust"
-          checked={remember}
-          onChange={e => setRemember(e.target.checked)}
-          style={{ accentColor: T.gold, width: 15, height: 15 }}
-        />
-        <label htmlFor="trust" style={{ color: 'rgba(232,192,122,0.6)', fontSize: 12, cursor: 'pointer' }}>
-          Trust this device (skip 2FA on this device)
-        </label>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:14 }}>
+        <input type="checkbox" id="trust-l" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
+        <label htmlFor="trust-l" style={{ color:'rgba(232,192,122,0.6)', fontSize:12, cursor:'pointer' }}>Trust this device (skip 2FA)</label>
       </div>
 
-      {error && <div style={ERR_STYLE}>⚠ {error}</div>}
-      <button style={BTN_PRIMARY} onClick={handleLogin} disabled={working}>
-        {working ? 'Verifying…' : 'Enter App'}
+      {error && <div style={S.err}>⚠ {error}</div>}
+
+      <button style={S.btn} onClick={handleLogin} disabled={working || !pin}>
+        {working ? 'Checking…' : 'Enter App'}
       </button>
 
-      <div style={{ textAlign: 'center', marginTop: 14 }}>
-        <button style={BTN_GHOST} onClick={() => {
-          if (window.confirm(
-            'Reset your PIN?\n\n' +
-            'WARNING: For security, ALL locally stored app data will also be cleared on this device. ' +
-            'Data in Supabase (transactions, documents) is not affected and will reload after you log in with your new PIN.\n\n' +
-            'Make sure you have a backup or Supabase connected before continuing.\n\n' +
-            'Continue?'
-          )) {
-            // Clear auth credentials
-            localStorage.removeItem('bl_auth_pin')
-            localStorage.removeItem('bl_auth_totp')
-            localStorage.removeItem('bl_auth_trusted')
-            // Clear all app data from localStorage so the new PIN holder
-            // cannot access the previous user's records on this device.
-            // Data in Supabase is unaffected and reloads after new login.
-            const AUTH_KEYS = ['bl_auth_pin','bl_auth_totp','bl_auth_trusted','bl_auth_config','bl_device_id','bl_session']
-            for (const key of Object.keys(localStorage)) {
-              if (!AUTH_KEYS.includes(key)) localStorage.removeItem(key)
-            }
-            sessionStorage.removeItem('bl_session')
-            setPin(''); setPinConfirm(''); setError(''); setStep('setup_pin')
-          }
-        }}>
-          Forgot PIN? Reset
-        </button>
+      <div style={{ textAlign:'center', marginTop:14 }}>
+        <button style={S.ghost} onClick={handleForgotPIN}>Forgot PIN? Reset</button>
       </div>
-    </Wrapper>
+    </Wrap>
   )
 
-  // ── 2FA step ───────────────────────────────────────────────────────────────
+  // ── LOGIN: TOTP ───────────────────────────────────────────────────────────
   if (step === 'totp') return (
-    <Wrapper>
-      <div style={{ color: T.goldBright, fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Two-Factor Authentication</div>
-      <div style={{ color: 'rgba(232,192,122,0.55)', fontSize: 12, lineHeight: 1.6, marginBottom: 20 }}>
-        Enter the 6-digit code from your authenticator app.
-      </div>
-      <OTPInput value={totp} onChange={setTotp} />
+    <Wrap>
+      <H title="Two-Factor Authentication" sub="Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.)." />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
-        <input type="checkbox" id="trust2" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor: T.gold }} />
-        <label htmlFor="trust2" style={{ color: 'rgba(232,192,122,0.6)', fontSize: 12, cursor: 'pointer' }}>Trust this device</label>
+      <label style={S.label}>6-digit code</label>
+      <input
+        ref={totpRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="000000"
+        value={totpCode}
+        maxLength={7}
+        autoComplete="one-time-code"
+        onChange={e => { setTotpCode(e.target.value.replace(/\D/g,'')); clear() }}
+        onKeyDown={e => e.key === 'Enter' && handleLoginTOTP()}
+        style={{ ...S.input, textAlign:'center', letterSpacing:'0.3em', fontSize:22 }}
+      />
+
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:14 }}>
+        <input type="checkbox" id="trust-t" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
+        <label htmlFor="trust-t" style={{ color:'rgba(232,192,122,0.6)', fontSize:12, cursor:'pointer' }}>Trust this device</label>
       </div>
 
-      {error && <div style={ERR_STYLE}>⚠ {error}</div>}
-      <button style={BTN_PRIMARY} onClick={handleTOTP} disabled={working || totp.length !== 6}>
+      {error && <div style={S.err}>⚠ {error}</div>}
+
+      <button style={S.btn} onClick={handleLoginTOTP} disabled={working || totpCode.replace(/\D/g,'').length !== 6}>
         {working ? 'Verifying…' : 'Confirm'}
       </button>
-      <div style={{ textAlign: 'center', marginTop: 10 }}>
-        <button style={BTN_GHOST} onClick={() => { setStep('login'); setTotp(''); setPin('') }}>← Back</button>
+
+      <div style={{ textAlign:'center', marginTop:10 }}>
+        <button style={S.ghost} onClick={() => { setStep('login'); setTotpCode(''); setPin(''); clear() }}>← Back to PIN</button>
       </div>
-    </Wrapper>
+    </Wrap>
   )
 
   return null
