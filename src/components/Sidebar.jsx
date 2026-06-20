@@ -17,7 +17,7 @@ const PAGE_ICONS = {
   settings:   { icon: '⊛', label: 'Settings' },
 }
 
-export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen }) {
+export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, onLogout }) {
   const groups = GROUPS.map(g => ({ group: g, items: NAV.filter(n => n.group === g) }))
   const navigate = id => { setPage(id); setMobileOpen(false) }
 
@@ -62,6 +62,20 @@ export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen }) {
         </div>
 
         <div className="sidebar-footer">
+          {onLogout && (
+            <button
+              onClick={() => { if (window.confirm('Lock the app and return to login?')) onLogout() }}
+              style={{
+                width: '100%', padding: '9px 14px', marginBottom: 12,
+                background: 'rgba(232,192,122,0.08)', border: '1px solid rgba(232,192,122,0.18)',
+                borderRadius: 10, color: 'rgba(232,192,122,0.65)', fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                fontFamily: "'Inter',sans-serif", letterSpacing: '0.04em',
+              }}
+            >
+              <span>🔒</span> Lock App
+            </button>
+          )}
           © Botanica Living Group 2026
           <div className="sidebar-version">In Business · PWA Ready · Samsung Optimised</div>
         </div>

@@ -133,6 +133,9 @@ export default function FinanceCentre({ finance, setFinance }) {
   const [csvRows,    setCsvRows]    = useState([])
   const [csvMeta,    setCsvMeta]    = useState({ fileName:'' })
 
+  // ── Quick doc preview from transaction row ─────────────────────────────────────
+  const [docPreviewTxn, setDocPreviewTxn] = useState(null)  // transaction whose source doc to preview
+
   // ── Review screen state ──────────────────────────────────────────────────────
   const [reviewOpen,   setReviewOpen]   = useState(false)
   const [reviewInfo,   setReviewInfo]   = useState(null)
@@ -201,13 +204,64 @@ export default function FinanceCentre({ finance, setFinance }) {
     setModal(false)
   }, [form, editing, finance, setFinance])
 
-  const delTxn = useCallback(id => {
-    if (!window.confirm('Delete this transaction?')) return
-    setFinance(ff=>(Array.isArray(ff)?ff:[]).filter(t=>t.id!==id))
-    if (SUPABASE_CONFIGURED) {
-      import('../lib/supabase.js').then(m=>m.deleteTransactionCloud(id)).catch(e=>console.warn('[Finance] delete:', e.message))
+  const delTxn = useCallback(async (txn) => {
+    const id = typeof txn === 'object' ? txn.id : txn
+    const t  = typeof txn === 'object' ? txn : (Array.isArray(finance) ? finance : []).find(x => x.id === id)
+
+    const hasDoc = !!(t?.sourceDocId || t?.sourceStoragePath || t?.sourcePublicUrl)
+
+    if (hasDoc) {
+      // Three-way choice: cancel / txn only / txn + doc
+      const choice = window.confirm(
+        `This transaction has a linked source document (${t?.sourceFile || 'document'}).\n\n` +
+        `Click OK to delete BOTH the transaction and its source document.\n` +
+        `Click Cancel to delete the transaction only (keeps the document).`
+      )
+      // null = user pressed Escape / closed = we treat same as Cancel (txn only)
+      // But window.confirm has no 3-way — so we use a second confirm for true cancel
+      const shouldDeleteDoc = choice   // OK = true, Cancel = false
+
+      // Give user a real cancel option
+      if (choice === true) {
+        // Confirmed: delete both
+        const confirmed = window.confirm('Delete transaction AND source document? This cannot be undone.')
+        if (!confirmed) return  // true cancel
+        // Delete transaction
+        setFinance(ff => (Array.isArray(ff) ? ff : []).filter(tx => tx.id !== id))
+        if (SUPABASE_CONFIGURED) {
+          import('../lib/supabase.js').then(async m => {
+            await m.deleteTransactionCloud(id).catch(e => console.warn('[Finance] del txn:', e.message))
+            // Delete source document
+            if (t?.sourceDocId || t?.sourceStoragePath) {
+              await m.deleteDocumentCloud({
+                id:           t.sourceDocId        || null,
+                storage_path: t.sourceStoragePath  || null,
+                public_url:   t.sourcePublicUrl    || null,
+                _idb_key:     t.sourceDocId        || null,
+              }).catch(e => console.warn('[Finance] del source doc:', e.message))
+            }
+          })
+        }
+        // Remove document from documents list state too
+        // (we don't have setDocuments here, but the document will be gone from Supabase
+        //  and will not reappear on next load)
+      } else {
+        // Delete transaction only, keep document
+        if (!window.confirm('Delete this transaction only? The source document will be kept in Business Documents.')) return
+        setFinance(ff => (Array.isArray(ff) ? ff : []).filter(tx => tx.id !== id))
+        if (SUPABASE_CONFIGURED) {
+          import('../lib/supabase.js').then(m => m.deleteTransactionCloud(id)).catch(e => console.warn('[Finance] del txn:', e.message))
+        }
+      }
+    } else {
+      // No linked document — simple delete
+      if (!window.confirm('Delete this transaction? This cannot be undone.')) return
+      setFinance(ff => (Array.isArray(ff) ? ff : []).filter(tx => tx.id !== id))
+      if (SUPABASE_CONFIGURED) {
+        import('../lib/supabase.js').then(m => m.deleteTransactionCloud(id)).catch(e => console.warn('[Finance] del txn:', e.message))
+      }
     }
-  }, [setFinance])
+  }, [finance, setFinance])
 
   // ── Review cleanup ────────────────────────────────────────────────────────────
   const cleanupReview = useCallback(() => {
@@ -640,10 +694,17 @@ export default function FinanceCentre({ finance, setFinance }) {
                             <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
                               <button className="btn btn-outline btn-xs" onClick={()=>openEdit(t)}>Edit</button>
                               {(t.sourceDocId || t.sourceStoragePath || t.sourcePublicUrl) && <>
-                                <button className="btn btn-outline btn-xs" title="View source document" onClick={()=>viewSourceDoc(t)}>📄</button>
+                                <button
+                                  className="btn btn-outline btn-xs"
+                                  title="Preview source document"
+                                  style={{background:T.goldPale,borderColor:T.gold,color:T.forest}}
+                                  onClick={()=>setDocPreviewTxn(t)}
+                                >
+                                  👁 Doc
+                                </button>
                                 <button className="btn btn-outline btn-xs" title="Download source document" onClick={()=>downloadSourceDoc(t)}>⬇</button>
                               </>}
-                              <button className="btn btn-xs btn-ghost" style={{color:T.textLight}} onClick={()=>delTxn(t.id)}>✕</button>
+                              <button className="btn btn-xs btn-ghost" style={{color:T.textLight}} onClick={()=>delTxn(t)}>✕</button>
                             </div>
                           </td>
                         </tr>
@@ -962,6 +1023,64 @@ export default function FinanceCentre({ finance, setFinance }) {
             <div style={{padding:'14px 22px',borderTop:`1px solid rgba(210,200,184,0.5)`,display:'flex',gap:10,justifyContent:'flex-end',flexShrink:0,flexWrap:'wrap'}}>
               <button className="btn btn-outline" onClick={cleanupReview}>Reject — Don't Save</button>
               <button className="btn btn-primary" onClick={approveReview}>✓ Approve & Save Transaction</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+      {/* ══ SOURCE DOCUMENT PREVIEW MODAL ════════════════════════════════════════
+          Reuses identical DocPreview component as Business Documents.
+          Opens when "👁 Doc" is clicked on a transaction row.
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {docPreviewTxn && (
+        <div className="modal-overlay" onClick={()=>setDocPreviewTxn(null)}>
+          <div
+            className="modal modal-xl"
+            style={{maxHeight:'92vh',display:'flex',flexDirection:'column',padding:0,width:'min(96vw,860px)'}}
+            onClick={e=>e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(210,200,184,0.5)`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,color:T.forest,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {docPreviewTxn.sourceFile || 'Source Document'}
+                </div>
+                <div style={{fontSize:11,color:T.textMid,marginTop:2}}>
+                  Source document for: {docPreviewTxn.description} · {ZAR(docPreviewTxn.amount)}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8,flexShrink:0}}>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={()=>viewSourceDoc(docPreviewTxn)}
+                >
+                  ↗ Open
+                </button>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={()=>downloadSourceDoc(docPreviewTxn)}
+                >
+                  ⬇ Download
+                </button>
+                <button className="modal-close" onClick={()=>setDocPreviewTxn(null)}>✕</button>
+              </div>
+            </div>
+
+            {/* Preview body — identical to BusinessDocuments */}
+            <div style={{flex:1,overflow:'auto',padding:16,minHeight:0}}>
+              <DocPreview
+                doc={{
+                  id:           docPreviewTxn.sourceDocId       || null,
+                  supabaseId:   docPreviewTxn.sourceDocId       || null,
+                  storage_path: docPreviewTxn.sourceStoragePath || null,
+                  public_url:   docPreviewTxn.sourcePublicUrl   || null,
+                  file_name:    docPreviewTxn.sourceFile        || 'document',
+                  file_type:    (docPreviewTxn.sourceFile||'').split('.').pop().toLowerCase() || '',
+                }}
+                onDownload={()=>downloadSourceDoc(docPreviewTxn)}
+                showDebug={false}
+              />
             </div>
           </div>
         </div>

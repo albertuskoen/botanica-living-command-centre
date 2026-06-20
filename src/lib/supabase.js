@@ -133,11 +133,8 @@ export async function uploadDocument(file, meta = {}) {
     .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false, cacheControl: '3600' })
   if (upErr) throw new Error(`Storage upload: ${upErr.message}`)
 
-  // 2. Get public URL (works for public bucket)
-  const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(path)
-  const publicUrl          = urlData?.publicUrl || null
-
-  // 3. Save to database
+  // 2. Save to database. public_url intentionally NOT stored.
+  // All access via createSignedUrl only — bucket must be private.
   const { data: doc, error: dbErr } = await client.from('documents').insert({
     file_name:         file.name,
     file_type:         ext,
@@ -145,7 +142,7 @@ export async function uploadDocument(file, meta = {}) {
     file_size_display: fmtBytes(file.size),
     category:          meta.category     || 'General',
     storage_path:      path,
-    public_url:        publicUrl,
+    public_url:        null,   // Always null — signed URLs used for all access
     notes:             meta.notes        || null,
     supplier_name:     meta.supplierName || null,
     date_uploaded:     meta.dateUploaded || today(),
@@ -177,18 +174,14 @@ export async function getDocumentUrl(doc, expiresIn = 3600) {
         return { url: data.signedUrl, source: 'signed', revoke: false }
       }
       // If signed URL fails, log and fall through
-      if (error) console.warn('[Supabase] createSignedUrl failed:', error.message, '— trying public URL')
+      if (error) console.warn('[Supabase] createSignedUrl failed:', error.message, '— falling back to IndexedDB')
     } catch (e) {
-      console.warn('[Supabase] createSignedUrl threw:', e.message, '— trying public URL')
+      console.warn('[Supabase] createSignedUrl threw:', e.message, '— falling back to IndexedDB')
     }
   }
 
-  // ── PRIORITY 2: Stored public URL (fallback when signed URL unavailable) ─────
-  // May fail with 404 if bucket name encoding in URL doesn't match,
-  // but kept as fallback for public buckets.
-  if (doc.public_url) {
-    return { url: doc.public_url, source: 'public', revoke: false }
-  }
+  // ── PRIORITY 2: IndexedDB cache (same-device offline fallback) ──────────────
+  // public_url is intentionally NOT used — bucket is private, all access via signed URL.
 
   // ── PRIORITY 3: IndexedDB cache (offline / same-device fallback) ─────────────
   const idbKey = doc.id || doc._idb_key
