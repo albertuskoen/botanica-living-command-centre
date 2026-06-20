@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import css from './utils/css.js'
 import useLocalStorage from './hooks/useLocalStorage.js'
+import { flushSyncQueue, SUPABASE_CONFIGURED, loadDocumentsFromCloud, loadTransactionsFromCloud } from './lib/supabase.js'
 import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS } from './utils/data.js'
 
 import Sidebar           from './components/Sidebar.jsx'
@@ -67,6 +68,65 @@ const ensureArray  = v => Array.isArray(v) ? v : []
 const ensureObj    = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}
 
 export default function App() {
+  // On mount: flush offline queue + load authoritative data from Supabase
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED) return
+
+    // Flush any ops queued while offline
+    flushSyncQueue().catch(console.warn)
+
+    // Load transactions from Supabase — overwrites localStorage copy
+    loadTransactionsFromCloud()
+      .then(rows => {
+        if (!rows || rows.length === 0) return
+        // Map Supabase column names to app field names
+        const mapped = rows.map(r => ({
+          id:            r.id,
+          date:          r.date,
+          type:          r.type,
+          amount:        parseFloat(r.amount) || 0,
+          category:      r.category,
+          description:   r.description,
+          supplierPayee: r.supplier_payee || '',
+          paymentMethod: r.payment_method || 'EFT',
+          notes:         r.notes || '',
+          invoiceNumber: r.invoice_number || '',
+          vatAmount:     parseFloat(r.vat_amount) || 0,
+          source:        r.source || 'manual',
+          sourceFile:    r.source_file || '',
+          sourceDocumentId: r.source_document_id || null,
+        }))
+        setFinance(mapped)
+      })
+      .catch(e => console.warn('[App] Supabase transactions load:', e.message))
+
+    // Load documents from Supabase — overwrites localStorage copy
+    loadDocumentsFromCloud()
+      .then(rows => {
+        if (!rows || rows.length === 0) return
+        const mapped = rows.map(r => ({
+          id:              r.id,          // Supabase UUID used as primary key
+          supabaseId:      r.id,
+          name:            r.file_name,
+          fileName:        r.file_name,
+          fileType:        r.file_type,
+          fileSize:        r.file_size_display || '',
+          fileSizeBytes:   r.file_size_bytes || 0,
+          category:        r.category || 'General',
+          dateUploaded:    r.date_uploaded || r.created_at?.split('T')[0] || '',
+          notes:           r.notes || '',
+          supplier:        r.supplier_name || '',
+          storagePath:     r.storage_path,
+          publicUrl:       r.public_url,
+          linkedTransactionId: r.linked_transaction_id || null,
+          hasFile:         true,
+          storageBackend:  'supabase',
+        }))
+        setDocuments(mapped)
+      })
+      .catch(e => console.warn('[App] Supabase documents load:', e.message))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [page,       setPage]       = useState('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
 

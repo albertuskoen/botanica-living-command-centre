@@ -18,7 +18,7 @@ import { FINANCE_CATEGORIES, PAYMENT_METHODS } from '../utils/data.js'
 import Modal from '../components/Modal.jsx'
 import { storeFile, createObjectURL, downloadFileById, formatBytes as fbytes } from '../lib/fileStore.js'
 import { OCR_AVAILABLE, extractPdfText, pdfPageToImageBlob, ocrImage, extractCsvRows, heuristicExtract, classifyText, extractViaBackend } from '../lib/ocr.js'
-import { SUPABASE_CONFIGURED } from '../lib/supabase.js'
+import { SUPABASE_CONFIGURED, insertTransactionCloud, linkDocumentToTransaction, uploadDocument, saveExtractionToCloud } from '../lib/supabase.js'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TYPE_COLORS = { 'Owner Investment':T.teal, 'Business Income':T.green, 'Business Expense':T.red }
@@ -149,12 +149,23 @@ export default function FinanceCentre({ finance, setFinance }) {
     const errs = validateTxn(form)
     if (Object.keys(errs).length) { setFormErrors(errs); return }
     const rec = { ...form, id:editing!=null?editing:nextId(Array.isArray(finance)?finance:[]), amount:parseNum(form.amount), vatAmount:parseNum(form.vatAmount), source:'manual' }
+    // Save to localStorage immediately
     if (editing!=null) { setFinance(ff=>(Array.isArray(ff)?ff:[]).map(t=>t.id===editing?rec:t)) }
     else               { setFinance(ff=>[...(Array.isArray(ff)?ff:[]),rec]) }
+    // Also persist to Supabase (non-blocking, queues if offline)
+    if (SUPABASE_CONFIGURED && editing==null) {
+      insertTransactionCloud(rec).catch(e => console.warn('[Finance] Supabase insert:', e.message))
+    }
     setModal(false)
   }, [form, editing, finance, setFinance])
 
-  const delTxn = id => { if (!window.confirm('Delete this transaction?')) return; setFinance(ff=>(Array.isArray(ff)?ff:[]).filter(t=>t.id!==id)) }
+  const delTxn = useCallback(id => {
+    if (!window.confirm('Delete this transaction?')) return
+    setFinance(ff=>(Array.isArray(ff)?ff:[]).filter(t=>t.id!==id))
+    if (SUPABASE_CONFIGURED) {
+      import('../lib/supabase.js').then(m=>m.deleteTransactionCloud(id)).catch(e=>console.warn('[Finance] delete txn:', e.message))
+    }
+  }, [setFinance])
   const F = k => e => { setForm(f=>({...f,[k]:e.target.value})); setFormErrors(er=>({...er,[k]:undefined})) }
   const RF= k => e => { setReviewForm(f=>({...f,[k]:e.target.value})); setReviewErrors(er=>({...er,[k]:undefined})) }
 
@@ -175,9 +186,21 @@ export default function FinanceCentre({ finance, setFinance }) {
       amount:    parseNum(reviewForm.amount),
       vatAmount: parseNum(reviewForm.vatAmount),
     }
+    // Save locally first (always works)
     setFinance(ff=>[...(Array.isArray(ff)?ff:[]),rec])
+    // Persist to Supabase (non-blocking — queues offline)
+    if (SUPABASE_CONFIGURED) {
+      insertTransactionCloud(rec)
+        .then(dbRec => {
+          if (dbRec?.id && reviewInfo?.supabaseDocId) {
+            linkDocumentToTransaction(reviewInfo.supabaseDocId, dbRec.id)
+              .catch(e => console.warn('[Finance] link doc:', e.message))
+          }
+        })
+        .catch(e => console.warn('[Finance] Supabase save:', e.message))
+    }
     cleanupReview()
-  }, [reviewForm, finance, setFinance, cleanupReview])
+  }, [reviewForm, finance, setFinance, cleanupReview, reviewInfo])
 
   // ── Approve CSV ────────────────────────────────────────────────────────────
   const approveCsv = useCallback(() => {
@@ -186,6 +209,10 @@ export default function FinanceCentre({ finance, setFinance }) {
     const base = nextId(Array.isArray(finance)?finance:[])
     const recs  = approved.map((r,i)=>({ id:base+i, date:r.date||today(), type:r.type, category:r.category, description:r.description, amount:r.amount, supplierPayee:r.supplierPayee, paymentMethod:'EFT', invoiceNumber:'', vatAmount:0, notes:`CSV · ${r.confidence} · ${csvMeta.fileName}`, source:'import', sourceFile:csvMeta.fileName }))
     setFinance(ff=>[...(Array.isArray(ff)?ff:[]),...recs])
+    // Persist each approved CSV row to Supabase
+    if (SUPABASE_CONFIGURED) {
+      recs.forEach(r => insertTransactionCloud(r).catch(e => console.warn('[Finance] CSV row to Supabase:', e.message)))
+    }
     setCsvRows([]); setImportStep('upload'); setImportOpen(false)
   }, [csvRows, csvMeta, finance, setFinance])
 
@@ -237,18 +264,33 @@ export default function FinanceCentre({ finance, setFinance }) {
       return
     }
 
-    // ── Shared processing: store file + extract text ──────────────────────────
-    // 1. Store file in IndexedDB
-    setProcessMsg('Storing file…'); setProcessPct(15)
+    // ── Shared processing: store file → Supabase → extract text ────────────────
+    // 1. Store file in IndexedDB (always, instant)
+    setProcessMsg('Storing file locally…'); setProcessPct(12)
     const docId = `fin-${Date.now()}`
     let fileStored = false
     try {
       await storeFile(docId, file)
       fileStored = true
-      setProcessPct(30)
+      setProcessPct(20)
     } catch (err) { console.warn('[Finance] IndexedDB store failed:', err.message) }
 
-    // 2. Build preview URL
+    // 2. Upload to Supabase Storage + create documents row
+    let supabaseDoc = null
+    if (SUPABASE_CONFIGURED) {
+      try {
+        setProcessMsg('Uploading to Supabase Storage…'); setProcessPct(25)
+        supabaseDoc = await uploadDocument(file, {
+          category: 'Invoices',
+          localDocId: docId,
+        })
+        setProcessPct(35)
+      } catch (err) {
+        console.warn('[Finance] Supabase upload failed, continuing locally:', err.message)
+      }
+    }
+
+    // 3. Build preview URL
     const previewUrl = URL.createObjectURL(file)
     previewUrlRef.current = previewUrl
 
@@ -286,7 +328,7 @@ export default function FinanceCentre({ finance, setFinance }) {
         try {
           setProcessMsg('Sending to AI for structured extraction…'); setProcessPct(92)
           const aiResult = await extractViaBackend(file, rawText)
-          openReviewScreen(file, docId, fileStored, previewUrl, 'pdf', aiResult, 'ai', rawText)
+          openReviewScreen(file, docId, fileStored, previewUrl, 'pdf', aiResult, 'ai', rawText, null, supabaseDoc)
           setImportOpen(false)
           return
         } catch (err) {
@@ -296,7 +338,7 @@ export default function FinanceCentre({ finance, setFinance }) {
 
       const extracted  = heuristicExtract(rawText)
       const classified = classifyText((extracted.supplierName||'')+(extracted.description||''))
-      openReviewScreen(file, docId, fileStored, previewUrl, 'pdf', extracted, ocrMethod, rawText, classified)
+      openReviewScreen(file, docId, fileStored, previewUrl, 'pdf', extracted, ocrMethod, rawText, classified, supabaseDoc)
       setImportOpen(false)
       return
     }
@@ -316,7 +358,7 @@ export default function FinanceCentre({ finance, setFinance }) {
         try {
           setProcessMsg('Sending to AI for structured extraction…'); setProcessPct(90)
           const aiResult = await extractViaBackend(file, rawText)
-          openReviewScreen(file, docId, fileStored, previewUrl, 'image', aiResult, 'ai', rawText)
+          openReviewScreen(file, docId, fileStored, previewUrl, 'image', aiResult, 'ai', rawText, null, supabaseDoc)
           setImportOpen(false)
           return
         } catch {}
@@ -324,7 +366,7 @@ export default function FinanceCentre({ finance, setFinance }) {
 
       const extracted  = heuristicExtract(rawText)
       const classified = classifyText((extracted.supplierName||'')+(extracted.description||''))
-      openReviewScreen(file, docId, fileStored, previewUrl, 'image', extracted, ocrMethod, rawText, classified)
+      openReviewScreen(file, docId, fileStored, previewUrl, 'image', extracted, ocrMethod, rawText, classified, supabaseDoc)
       setImportOpen(false)
       return
     }
@@ -335,12 +377,24 @@ export default function FinanceCentre({ finance, setFinance }) {
   }, [])
 
   // ── Open review screen ─────────────────────────────────────────────────────
-  function openReviewScreen(file, docId, fileStored, previewUrl, mediaType, extracted, ocrMethod, rawText='', classified=null) {
+  function openReviewScreen(file, docId, fileStored, previewUrl, mediaType, extracted, ocrMethod, rawText='', classified=null, sbDoc=null) {
     const ext     = file.name.split('.').pop().toLowerCase()
     const cls     = classified || classifyText((extracted?.supplierName||'')+(extracted?.description||''))
     const conf    = extracted?.confidence || cls.confidence
 
-    setReviewInfo({ fileName:file.name, docId, fileStored, ocrMethod, confidence:conf, rawText, mediaType })
+    setReviewInfo({ fileName:file.name, docId, fileStored, ocrMethod, confidence:conf, rawText, mediaType, supabaseDocId: sbDoc?.id || null })
+
+    // Write extraction result to document_extractions table (if we have a Supabase doc ID)
+    if (sbDoc?.id && extracted) {
+      saveExtractionToCloud(sbDoc.id, {
+        ...extracted,
+        suggestedType:     cls?.type,
+        suggestedCategory: cls?.category,
+        confidence:        conf,
+        rawText,
+      }, ocrMethod).catch(e => console.warn('[Finance] save extraction:', e.message))
+    }
+
     setReviewPreview({ url:previewUrl, type:mediaType, ext })
     setReviewForm({
       date:          extracted?.invoiceDate || today(),
