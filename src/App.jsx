@@ -81,20 +81,22 @@ export default function App() {
         if (!rows || rows.length === 0) return
         // Map Supabase column names to app field names
         const mapped = rows.map(r => ({
-          id:            r.id,
-          date:          r.date,
-          type:          r.type,
-          amount:        parseFloat(r.amount) || 0,
-          category:      r.category,
-          description:   r.description,
-          supplierPayee: r.supplier_payee || '',
-          paymentMethod: r.payment_method || 'EFT',
-          notes:         r.notes || '',
-          invoiceNumber: r.invoice_number || '',
-          vatAmount:     parseFloat(r.vat_amount) || 0,
-          source:        r.source || 'manual',
-          sourceFile:    r.source_file || '',
-          sourceDocumentId: r.source_document_id || null,
+          id:                r.id,
+          date:              r.date,
+          type:              r.type,
+          amount:            parseFloat(r.amount) || 0,
+          category:          r.category,
+          description:       r.description,
+          supplierPayee:     r.supplier_payee || '',
+          paymentMethod:     r.payment_method || 'EFT',
+          notes:             r.notes || '',
+          invoiceNumber:     r.invoice_number || '',
+          vatAmount:         parseFloat(r.vat_amount) || 0,
+          source:            r.source || 'manual',
+          sourceFile:        r.source_file || '',
+          sourceDocumentId:  r.source_document_id || null,
+          // Supabase storage info — needed by viewSourceDoc / downloadSourceDoc after refresh
+          sourceDocId:       r.source_document_id || null,
         }))
         setFinance(mapped)
       })
