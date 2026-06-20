@@ -1,12 +1,34 @@
-import { useState, useRef, useEffect } from 'react'
+// FinanceCentre.jsx — v1.5
+// Architecture:
+//   • Manual transaction entry → always works, saves to localStorage
+//   • Document import → uploads to Supabase Storage (if configured), falls back to local preview
+//   • PDF text extraction → pdf.js (CDN, no key needed) for text-based PDFs
+//   • OCR/AI extraction → calls /api/extract serverless function (requires OCR_SECRET_KEY in Vercel)
+//   • Review screen → user edits all fields before any transaction is created
+//   • localStorage is the authoritative data store until Supabase is connected
+
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { T } from '../utils/tokens.js'
-import { ZAR, fmtDate, nextId, today } from '../utils/format.js'
+import { ZAR, fmtDate, nextId, today, parseNum, safeAmount } from '../utils/format.js'
 import { FINANCE_CATEGORIES, PAYMENT_METHODS } from '../utils/data.js'
 import Modal from '../components/Modal.jsx'
+import {
+  SUPABASE_CONFIGURED,
+  OCR_CONFIGURED as SB_OCR_CONFIGURED,
+  uploadDocument,
+  insertTransaction,
+  updateDocumentLink,
+} from '../lib/supabase.js'
+import {
+  OCR_AVAILABLE,
+  extractPdfText,
+  extractCsvRows,
+  heuristicExtract,
+  classifyText,
+  extractViaBackend,
+} from '../lib/ocr.js'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
 const TYPE_COLORS = {
   'Owner Investment': T.teal,
   'Business Income':  T.green,
@@ -17,488 +39,485 @@ const TYPE_BG = {
   'Business Income':  T.greenPale,
   'Business Expense': T.redPale,
 }
+const CONF_COLORS = {
+  'High Confidence':   T.green,
+  'Medium Confidence': T.gold,
+  'Needs Review':      T.danger,
+}
 const BLANK_TXN = {
   date: today(), type: 'Business Expense', category: 'Other Expense',
-  description: '', amount: '', supplierPayee: '', paymentMethod: 'EFT', notes: '',
-  sourceFile: '', invoiceNumber: '', vatAmount: '',
-}
-const CONF_COLOR = { 'High Confidence': T.forestLight, 'Medium Confidence': T.gold, 'Needs Review': T.danger }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AUTO-CLASSIFY  – rules applied to any text blob
-// ─────────────────────────────────────────────────────────────────────────────
-function autoClassify(text, amount) {
-  const d   = (text || '').toLowerCase()
-  const amt = parseFloat(String(amount || 0).replace(/[^0-9.-]/g, '')) || 0
-
-  // Type override first
-  if (d.match(/capital|investment|owner deposit|transfer from owner/)) {
-    return { type: 'Owner Investment', category: 'Owner Capital', confidence: 'High Confidence' }
-  }
-  if (d.match(/payment received|deposit from customer|sales invoice paid/)) {
-    return { type: 'Business Income', category: 'Product Sales', confidence: 'Medium Confidence' }
-  }
-
-  // Expense categories
-  let category   = 'Other Expense'
-  let confidence = 'Needs Review'
-
-  const rules = [
-    [/cipc/,                                     'CIPC / Compliance',    'High Confidence'],
-    [/sars|south african revenue|income tax/,    'SARS / Tax',           'High Confidence'],
-    [/domain|email|domains\.co\.za|web hosting/, 'Domain & Email',       'High Confidence'],
-    [/vercel|github|netlify|hosting|website/,    'Website & Digital',    'High Confidence'],
-    [/dhl|fedex|courier|shipping|freight/,       'Freight & Courier',    'High Confidence'],
-    [/customs|clearing|duty|import|excise/,      'Customs & Clearing',   'High Confidence'],
-    [/sample|supplier sample|product sample/,    'Supplier Samples',     'High Confidence'],
-    [/marketing|facebook|google ads|instagram/,  'Marketing',            'High Confidence'],
-    [/packaging|assembly|pot |packing/,          'Assembly & Packaging', 'High Confidence'],
-    [/bank fee|service fee|monthly fee|account fee/, 'Banking Fees',     'High Confidence'],
-    [/travel|uber|petrol|fuel|accommodation/,    'Travel',               'Medium Confidence'],
-    [/invoice|receipt|payment/,                  'Other Expense',        'Medium Confidence'],
-  ]
-
-  for (const [re, cat, conf] of rules) {
-    if (re.test(d)) { category = cat; confidence = conf; break }
-  }
-
-  return { type: 'Business Expense', category, confidence }
+  description: '', amount: '', supplierPayee: '', paymentMethod: 'EFT',
+  notes: '', invoiceNumber: '', vatAmount: '',
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EXTRACT from raw OCR / CSV text  →  structured fields
-// ─────────────────────────────────────────────────────────────────────────────
-function extractFields(text) {
-  const out = {
-    supplierName:   '',
-    invoiceNumber:  '',
-    invoiceDate:    today(),
-    totalAmount:    0,
-    vatAmount:      0,
-    description:    '',
-    rawLines:       [],
-  }
-
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  out.rawLines = lines
-
-  // Supplier name – first non-empty line that doesn't look like a header
-  const skip = /invoice|receipt|tax invoice|statement|date|vat|reg|pty/i
-  for (const l of lines.slice(0, 8)) {
-    if (!skip.test(l) && l.length > 3 && l.length < 60) { out.supplierName = l; break }
-  }
-
-  // Invoice number
-  const invMatch = text.match(/inv(?:oice)?\s*(?:no\.?|number|#)?\s*[:\-]?\s*([A-Z0-9\-/]+)/i)
-  if (invMatch) out.invoiceNumber = invMatch[1].trim()
-
-  // Date – look for common formats
-  const dateMatch = text.match(/\b(\d{1,2}[\s/-]\w+[\s/-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})\b/)
-  if (dateMatch) {
-    try {
-      const d = new Date(dateMatch[1])
-      if (!isNaN(d)) out.invoiceDate = d.toISOString().split('T')[0]
-    } catch {}
-  }
-
-  // Total amount – prefer lines with "total" label
-  const totalMatch = text.match(/(?:total|amount due|grand total|balance due)[^\d]*R?\s*([\d\s,]+\.?\d*)/i)
-  if (totalMatch) {
-    out.totalAmount = parseFloat(totalMatch[1].replace(/[\s,]/g, '')) || 0
-  } else {
-    // Fallback: largest R amount in document
-    const amounts = [...text.matchAll(/R\s?([\d,]+\.?\d*)/g)]
-      .map(m => parseFloat(m[1].replace(/,/g, '')))
-      .filter(n => !isNaN(n) && n > 0)
-    if (amounts.length) out.totalAmount = Math.max(...amounts)
-  }
-
-  // VAT
-  const vatMatch = text.match(/(?:vat|tax)[^\d]*R?\s*([\d,]+\.?\d*)/i)
-  if (vatMatch) out.vatAmount = parseFloat(vatMatch[1].replace(/,/g, '')) || 0
-
-  // Description – concatenate meaningful lines
-  out.description = lines
-    .filter(l => l.length > 5 && l.length < 120 && !/^\d+$/.test(l))
-    .slice(0, 4)
-    .join(' · ')
-    .substring(0, 200)
-
-  return out
+// ── Safe finance aggregation ───────────────────────────────────────────────────
+function sumByType(finance, type) {
+  if (!Array.isArray(finance)) return 0
+  return finance
+    .filter(t => t?.type === type)
+    .reduce((s, t) => s + safeAmount(t?.amount), 0)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CSV PARSE  →  array of row objects
-// ─────────────────────────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.split('\n').filter(l => l.trim())
-  if (lines.length < 2) return []
-  // Auto-detect delimiter
-  const delim = (lines[0].match(/\t/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? '\t' : ','
-  const headers = lines[0].split(delim).map(h => h.replace(/"/g, '').trim().toLowerCase())
-
-  return lines.slice(1).map((line, i) => {
-    const cols   = line.split(delim).map(c => c.replace(/"/g, '').trim())
-    const get    = (...keys) => { for (const k of keys) { const idx = headers.indexOf(k); if (idx !== -1 && cols[idx]) return cols[idx] } return '' }
-
-    const desc   = get('description', 'narration', 'details', 'transaction description', 'reference') || cols[1] || cols[0] || ''
-    const rawAmt = get('amount', 'debit', 'credit', 'value') || cols[2] || cols[3] || '0'
-    const amount = Math.abs(parseFloat(rawAmt.replace(/[^0-9.-]/g, '')) || 0)
-    const date   = get('date', 'transaction date', 'posting date') || cols[0] || today()
-    const payee  = get('payee', 'merchant', 'supplier', 'beneficiary') || cols[4] || ''
-
-    const classified = autoClassify(desc + ' ' + payee, amount)
-
-    return {
-      _id:          i + 1,
-      date,
-      description:  desc,
-      amount,
-      supplierPayee: payee,
-      invoiceNumber: '',
-      vatAmount:    0,
-      sourceFile:   '',
-      rawText:      desc,
-      ...classified,
-      approved:     amount > 0,
-    }
-  }).filter(r => r.amount > 0 || r.description)
+// ── Form validation ────────────────────────────────────────────────────────────
+function validateTxn(form) {
+  const errors = {}
+  if (!form.description?.trim()) errors.description = 'Description is required'
+  const amt = parseNum(form.amount)
+  if (!form.amount || amt <= 0) errors.amount = 'Amount must be greater than zero'
+  if (isNaN(new Date(form.date).getTime())) errors.date = 'Enter a valid date'
+  return errors
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LOAD pdf.js / Tesseract dynamically (CDN, no npm install needed)
-// ─────────────────────────────────────────────────────────────────────────────
-async function loadPdfJs() {
-  if (window.pdfjsLib) return window.pdfjsLib
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-    s.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-      resolve(window.pdfjsLib)
-    }
-    s.onerror = reject
-    document.head.appendChild(s)
-  })
+// ── Status badge ───────────────────────────────────────────────────────────────
+function TypeBadge({ type }) {
+  return (
+    <span style={{
+      background: TYPE_BG[type], color: TYPE_COLORS[type],
+      padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+    }}>
+      {type === 'Owner Investment' ? 'Investment' : type === 'Business Income' ? 'Income' : 'Expense'}
+    </span>
+  )
 }
 
-async function loadTesseract() {
-  if (window.Tesseract) return window.Tesseract
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js'
-    s.onload = () => resolve(window.Tesseract)
-    s.onerror = reject
-    document.head.appendChild(s)
-  })
+// ── Connection status notice ───────────────────────────────────────────────────
+function ConnectionNotice() {
+  if (SUPABASE_CONFIGURED) return null
+  return (
+    <div style={{
+      background: T.goldPale, border: `1px solid rgba(184,151,90,0.25)`,
+      borderRadius: 10, padding: '11px 16px', marginBottom: 18,
+      fontSize: 12, color: '#6B4E10', display: 'flex', gap: 10, alignItems: 'flex-start',
+    }}>
+      <span style={{ fontSize: 16, flexShrink: 0 }}>☁</span>
+      <div>
+        <strong>Cloud storage is not connected.</strong> Finance transactions are saved locally in your browser.
+        To enable permanent cloud storage, add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your
+        environment variables. See <strong>SETUP.md</strong> for instructions.
+      </div>
+    </div>
+  )
 }
 
-async function extractTextFromPDF(file) {
-  const pdfjsLib = await loadPdfJs()
-  const arrayBuffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-  let fullText = ''
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page    = await pdf.getPage(i)
-    const content = await page.getTextContent()
-    fullText += content.items.map(item => item.str).join(' ') + '\n'
-  }
-  return fullText.trim()
-}
-
-async function extractTextFromImage(file, onProgress) {
-  const Tesseract = await loadTesseract()
-  const result = await Tesseract.recognize(file, 'eng', {
-    logger: m => { if (m.status === 'recognizing text' && onProgress) onProgress(Math.round(m.progress * 100)) },
-  })
-  return result.data.text
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 export default function FinanceCentre({ finance, setFinance }) {
-  const [tab, setTab]               = useState('overview')
-  const [modal, setModal]           = useState(false)
-  const [editing, setEditing]       = useState(null)
-  const [form, setForm]             = useState(BLANK_TXN)
+  const [tab,        setTab]        = useState('overview')
+  const [modal,      setModal]      = useState(false)
+  const [editing,    setEditing]    = useState(null)
+  const [form,       setForm]       = useState(BLANK_TXN)
+  const [formErrors, setFormErrors] = useState({})
   const [filterType, setFilterType] = useState('All')
 
-  // Import workflow state
-  const [importWizard, setImportWizard] = useState(false)  // wizard open
-  const [importStep,   setImportStep]   = useState('upload') // 'upload' | 'processing' | 'review'
-  const [importRows,   setImportRows]   = useState([])
-  const [importMeta,   setImportMeta]   = useState({ fileName:'', type:'csv', ocrNote:'' })
-  const [processingPct, setProcessingPct] = useState(0)
-  const [processingMsg, setProcessingMsg] = useState('')
+  // ── Import workflow ──────────────────────────────────────────────────────────
+  const [importOpen,   setImportOpen]   = useState(false)
+  const [importStep,   setImportStep]   = useState('upload')
+  // upload → processing → review_single | review_csv → done
 
-  // Single-doc review (PDF/image → one transaction)
-  const [singleReview, setSingleReview] = useState(null)   // null | { extracted, classified, fileName }
+  const [processingMsg, setProcessingMsg] = useState('')
+  const [processingPct, setProcessingPct] = useState(0)
+  const [importError,   setImportError]   = useState('')
+
+  // Single document review state (PDF / image)
+  const [docReview,    setDocReview]    = useState(null)  // { file, docRecord, extracted, classified, previewUrl, rawText, ocrUsed }
+  const [reviewForm,   setReviewForm]   = useState(null)  // editable form state for review screen
+  const [reviewErrors, setReviewErrors] = useState({})
+
+  // CSV multi-row review
+  const [csvRows,   setCsvRows]   = useState([])
+  const [csvMeta,   setCsvMeta]   = useState({ fileName: '', headers: [] })
 
   const fileRef = useRef()
 
-  // ── Aggregates (shared by manual + auto) ────────────────────────────────────
-  const invested  = finance.filter(t => t.type === 'Owner Investment').reduce((s, t) => s + Number(t.amount), 0)
-  const income    = finance.filter(t => t.type === 'Business Income').reduce((s, t)  => s + Number(t.amount), 0)
-  const expenses  = finance.filter(t => t.type === 'Business Expense').reduce((s, t) => s + Number(t.amount), 0)
+  // ── Finance aggregates ───────────────────────────────────────────────────────
+  const invested  = useMemo(() => sumByType(finance, 'Owner Investment'), [finance])
+  const income    = useMemo(() => sumByType(finance, 'Business Income'),  [finance])
+  const expenses  = useMemo(() => sumByType(finance, 'Business Expense'), [finance])
   const remaining = invested - expenses
   const net       = income - expenses
 
-  const F = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  // ── Monthly summary ──────────────────────────────────────────────────────────
+  const monthly = useMemo(() => {
+    const m = {}
+    if (!Array.isArray(finance)) return m
+    finance.forEach(t => {
+      const key = (t?.date || '').substring(0, 7) || 'Unknown'
+      if (!m[key]) m[key] = { inv: 0, inc: 0, exp: 0 }
+      if (t?.type === 'Owner Investment') m[key].inv += safeAmount(t.amount)
+      else if (t?.type === 'Business Income') m[key].inc += safeAmount(t.amount)
+      else m[key].exp += safeAmount(t.amount)
+    })
+    return m
+  }, [finance])
 
-  // ── Manual add/edit/delete ──────────────────────────────────────────────────
-  const openNew = () => {
-    setEditing(null)
-    setForm({ ...BLANK_TXN, date: today() })
-    setModal(true)
-  }
-  const openEdit = t => { setEditing(t.id); setForm(t); setModal(true) }
+  // ── Category summary ─────────────────────────────────────────────────────────
+  const catSummary = useMemo(() => {
+    const c = {}
+    if (!Array.isArray(finance)) return c
+    finance.filter(t => t?.type === 'Business Expense').forEach(t => {
+      c[t.category] = (c[t.category] || 0) + safeAmount(t.amount)
+    })
+    return Object.entries(c).sort((a, b) => b[1] - a[1])
+  }, [finance])
 
-  const save = () => {
-    if (!form.description || !form.amount) return
+  // ── Visible transactions ─────────────────────────────────────────────────────
+  const visibleTxns = useMemo(() => {
+    const list = Array.isArray(finance) ? finance : []
+    return (filterType === 'All' ? list : list.filter(t => t?.type === filterType))
+      .slice()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  }, [finance, filterType])
+
+  // ── Manual transaction CRUD ──────────────────────────────────────────────────
+  const openNew  = () => { setEditing(null); setForm({ ...BLANK_TXN, date: today() }); setFormErrors({}); setModal(true) }
+  const openEdit = t  => { setEditing(t.id); setForm({ ...t, amount: String(t.amount ?? '') }); setFormErrors({}); setModal(true) }
+
+  const saveTxn = useCallback(async () => {
+    const errs = validateTxn(form)
+    if (Object.keys(errs).length) { setFormErrors(errs); return }
+
     const rec = {
       ...form,
-      id:     editing || nextId(finance),
-      amount: parseFloat(form.amount) || 0,
-      source: editing ? form.source || 'manual' : 'manual',
+      id:     editing != null ? editing : nextId(Array.isArray(finance) ? finance : []),
+      amount: parseNum(form.amount),
+      vatAmount: parseNum(form.vatAmount),
+      source: 'manual',
     }
-    editing
-      ? setFinance(ff => ff.map(t => t.id === editing ? rec : t))
-      : setFinance(ff => [...ff, rec])
+
+    // Try Supabase first, fall back to local
+    if (SUPABASE_CONFIGURED && editing == null) {
+      try { await insertTransaction(rec) } catch (e) { console.warn('[Finance] Supabase insert failed, saving locally:', e.message) }
+    }
+
+    if (editing != null) {
+      setFinance(ff => (Array.isArray(ff) ? ff : []).map(t => t.id === editing ? rec : t))
+    } else {
+      setFinance(ff => [...(Array.isArray(ff) ? ff : []), rec])
+    }
     setModal(false)
-  }
+  }, [form, editing, finance, setFinance])
 
-  const del = id => window.confirm('Delete transaction?') && setFinance(ff => ff.filter(t => t.id !== id))
+  const delTxn = useCallback(id => {
+    if (!window.confirm('Delete this transaction? This cannot be undone.')) return
+    setFinance(ff => (Array.isArray(ff) ? ff : []).filter(t => t.id !== id))
+  }, [setFinance])
 
-  // ── File import entry point ─────────────────────────────────────────────────
-  const handleFileSelected = async e => {
-    const file = e.target.files[0]
+  const F = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setFormErrors(er => ({ ...er, [k]: undefined })) }
+
+  // ── Import: file selected ────────────────────────────────────────────────────
+  const handleFileSelected = useCallback(async e => {
+    const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
 
-    const ext  = file.name.split('.').pop().toLowerCase()
-    const name = file.name
+    const ext = file.name.split('.').pop().toLowerCase()
+    setImportError('')
+    setImportStep('processing')
+    setProcessingPct(5)
+    setProcessingMsg('Reading file…')
 
-    // ── CSV ──
+    // ── CSV / TSV ──────────────────────────────────────────────────────────────
     if (ext === 'csv' || ext === 'tsv') {
-      setImportMeta({ fileName: name, type: 'csv', ocrNote: '' })
-      setImportStep('processing')
-      setImportWizard(true)
-      setProcessingMsg('Reading CSV…')
-      setProcessingPct(30)
-      const reader = new FileReader()
-      reader.onload = ev => {
-        const rows = parseCSV(ev.target.result)
-        setImportRows(rows)
+      try {
+        setProcessingMsg('Parsing CSV…')
+        setProcessingPct(50)
+        const { headers, rows } = await extractCsvRows(file)
         setProcessingPct(100)
-        setImportStep('review')
-        setProcessingMsg('')
+
+        // Map rows to reviewable transactions
+        const mapped = rows.map((cols, i) => {
+          const get = (...keys) => {
+            for (const k of keys) {
+              const idx = headers.findIndex(h => h.toLowerCase() === k.toLowerCase())
+              if (idx !== -1 && cols[idx]) return cols[idx]
+            }
+            return ''
+          }
+          const desc    = get('description','narration','details','reference') || cols[1] || ''
+          const rawAmt  = get('amount','debit','credit','value') || cols[2] || '0'
+          const amount  = Math.abs(parseFloat(rawAmt.replace(/[^0-9.-]/g, '')) || 0)
+          const date    = get('date','transaction date','posting date') || cols[0] || today()
+          const payee   = get('payee','merchant','supplier','beneficiary') || ''
+          const cls     = classifyText(desc + ' ' + payee, amount)
+          return { _id: i + 1, date, description: desc, amount, supplierPayee: payee, invoiceNumber: '', vatAmount: 0, ...cls, approved: amount > 0 }
+        }).filter(r => r.amount > 0 || r.description)
+
+        setCsvRows(mapped)
+        setCsvMeta({ fileName: file.name, headers })
+        setImportStep('review_csv')
+      } catch (err) {
+        setImportError(`CSV parsing failed: ${err.message}`)
+        setImportStep('upload')
       }
-      reader.readAsText(file)
       return
     }
 
-    // ── Excel (xlsx) – read as CSV-like via text ──
-    if (ext === 'xlsx' || ext === 'xls') {
-      setImportMeta({ fileName: name, type: 'excel', ocrNote: 'Excel files are read as text. For best results use CSV export from your bank.' })
-      setImportStep('processing')
-      setImportWizard(true)
-      setProcessingMsg('Reading Excel file…')
-      setProcessingPct(40)
-      const reader = new FileReader()
-      reader.onload = ev => {
-        // Basic text extraction from xlsx – works for simple sheets
-        const raw = ev.target.result
-        // Extract printable ASCII rows
-        const textRows = raw.match(/[A-Za-z0-9 .,/\-:]{5,}/g) || []
-        const fakeCSV  = textRows.join('\n')
-        const rows     = parseCSV(fakeCSV).slice(0, 50)
-        setImportRows(rows.length ? rows : [])
-        setProcessingPct(100)
-        setImportStep(rows.length ? 'review' : 'upload')
-        if (!rows.length) {
-          setImportMeta(m => ({ ...m, ocrNote: 'Could not extract rows from Excel. Please export as CSV from your bank and try again.' }))
-        }
-        setProcessingMsg('')
-      }
-      reader.readAsBinaryString(file)
-      return
-    }
-
-    // ── PDF ──
+    // ── PDF ────────────────────────────────────────────────────────────────────
     if (ext === 'pdf') {
-      setImportMeta({ fileName: name, type: 'pdf', ocrNote: '' })
-      setImportStep('processing')
-      setImportWizard(true)
       setProcessingMsg('Loading PDF reader…')
       setProcessingPct(10)
-      try {
-        const text = await extractTextFromPDF(file)
-        setProcessingPct(80)
-        if (text.trim().length > 20) {
-          // Text-based PDF
-          const extracted   = extractFields(text)
-          const classified  = autoClassify(text, extracted.totalAmount)
-          setProcessingPct(100)
-          setImportStep('single')
-          setSingleReview({ extracted, classified, fileName: name, rawText: text })
-          setImportWizard(false)
-        } else {
-          // Scanned PDF – try OCR on first page as image
-          setProcessingMsg('No text found. Attempting OCR…')
-          setProcessingPct(50)
-          try {
-            await loadTesseract()
-            const arrayBuffer = await file.arrayBuffer()
-            const pdfjsLib    = await loadPdfJs()
-            const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-            const page        = await pdf.getPage(1)
-            const viewport    = page.getViewport({ scale: 2 })
-            const canvas      = document.createElement('canvas')
-            canvas.width      = viewport.width
-            canvas.height     = viewport.height
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-            const blob        = await new Promise(res => canvas.toBlob(res, 'image/png'))
-            const ocrText     = await extractTextFromImage(blob, pct => setProcessingPct(50 + Math.round(pct / 2)))
-            const extracted   = extractFields(ocrText)
-            const classified  = autoClassify(ocrText, extracted.totalAmount)
-            setSingleReview({ extracted, classified, fileName: name, rawText: ocrText, ocrUsed: true })
-            setImportStep('single')
-            setImportWizard(false)
-          } catch {
-            setImportMeta(m => ({ ...m, ocrNote: 'Scanned document reading may need future cloud AI support. Please add the transaction manually.' }))
-            setImportStep('upload')
-          }
+
+      // 1. Upload to Supabase if configured
+      let docRecord = null
+      if (SUPABASE_CONFIGURED) {
+        try {
+          setProcessingMsg('Uploading to cloud storage…')
+          setProcessingPct(20)
+          docRecord = await uploadDocument(file, { category: 'Invoices' })
+          setProcessingPct(35)
+        } catch (err) {
+          console.warn('[Finance] Supabase upload failed, continuing locally:', err.message)
         }
-      } catch (err) {
-        setImportMeta(m => ({ ...m, ocrNote: `PDF reading failed: ${err.message}. Try CSV or add manually.` }))
-        setImportStep('upload')
       }
-      setProcessingMsg('')
-      return
-    }
 
-    // ── Image (JPG, PNG, WEBP) ──
-    if (['jpg','jpeg','png','webp','gif','bmp','tiff'].includes(ext)) {
-      setImportMeta({ fileName: name, type: 'image', ocrNote: '' })
-      setImportStep('processing')
-      setImportWizard(true)
-      setProcessingMsg('Loading OCR engine…')
-      setProcessingPct(5)
+      // 2. Extract text with pdf.js (always available)
+      let pdfText = ''
+      let isTextBased = false
       try {
-        const ocrText   = await extractTextFromImage(file, pct => {
-          setProcessingPct(5 + Math.round(pct * 0.9))
-          setProcessingMsg(`Reading document… ${pct}%`)
-        })
-        const extracted  = extractFields(ocrText)
-        const classified = autoClassify(ocrText, extracted.totalAmount)
-        setProcessingPct(100)
-        setImportStep('single')
-        setSingleReview({ extracted, classified, fileName: name, rawText: ocrText, ocrUsed: true })
-        setImportWizard(false)
+        setProcessingMsg('Extracting text from PDF…')
+        setProcessingPct(45)
+        const result = await extractPdfText(file)
+        pdfText      = result.text
+        isTextBased  = result.isTextBased
+        setProcessingPct(60)
       } catch (err) {
-        setImportMeta(m => ({ ...m, ocrNote: `OCR failed: ${err.message}. Please add manually.` }))
-        setImportStep('upload')
+        console.warn('[Finance] PDF text extraction failed:', err.message)
       }
-      setProcessingMsg('')
+
+      // 3. Build preview URL for display
+      const previewUrl = URL.createObjectURL(new Blob([await file.arrayBuffer()], { type: 'application/pdf' }))
+
+      // 4. Attempt AI extraction if available
+      let extracted  = null
+      let ocrUsed    = false
+      let ocrError   = ''
+
+      if (isTextBased && OCR_AVAILABLE) {
+        try {
+          setProcessingMsg('Sending to AI for data extraction…')
+          setProcessingPct(70)
+          extracted = await extractViaBackend(file, pdfText)
+          ocrUsed   = true
+          setProcessingPct(90)
+        } catch (err) {
+          ocrError = err.message === 'OCR_NOT_CONFIGURED'
+            ? 'AI extraction not configured on server.'
+            : `AI extraction failed: ${err.message}`
+        }
+      } else if (!isTextBased && OCR_AVAILABLE) {
+        try {
+          setProcessingMsg('Running OCR on scanned PDF…')
+          setProcessingPct(70)
+          extracted = await extractViaBackend(file, '')
+          ocrUsed   = true
+          setProcessingPct(90)
+        } catch (err) {
+          ocrError = `OCR failed: ${err.message}`
+        }
+      }
+
+      // 5. Fall back to heuristic extraction if no AI
+      if (!extracted && isTextBased) {
+        extracted = heuristicExtract(pdfText)
+        ocrUsed   = false
+      }
+
+      // 6. Classify
+      const classified = extracted
+        ? classifyText((extracted.supplierName || '') + ' ' + (extracted.description || ''), extracted.totalAmount)
+        : { type: 'Business Expense', category: 'Other Expense', confidence: 'Needs Review' }
+
+      // Override confidence from extracted if present
+      if (extracted?.confidence) classified.confidence = extracted.confidence
+
+      // 7. Build review form
+      const rf = {
+        date:          extracted?.invoiceDate || today(),
+        type:          extracted?.suggestedType    || classified.type,
+        category:      extracted?.suggestedCategory || classified.category,
+        description:   extracted?.description || extracted?.supplierName || '',
+        amount:        String(extracted?.totalAmount || ''),
+        supplierPayee: extracted?.supplierName || '',
+        paymentMethod: 'EFT',
+        invoiceNumber: extracted?.invoiceNumber || '',
+        vatAmount:     String(extracted?.vatAmount || ''),
+        notes:         ocrUsed ? `Extracted via AI · ${classified.confidence}` : isTextBased ? `Extracted from PDF text · ${classified.confidence}` : 'Manual review required',
+        sourceDocumentId: docRecord?.id || null,
+        sourceFile:       file.name,
+        source:           ocrUsed ? 'ocr' : 'import',
+      }
+
+      setDocReview({
+        file, docRecord, extracted, classified, previewUrl,
+        rawText: pdfText, ocrUsed, ocrError, isTextBased,
+        fileName: file.name,
+      })
+      setReviewForm(rf)
+      setReviewErrors({})
+      setProcessingPct(100)
+      setImportStep('review_single')
+      setImportOpen(false)  // close wizard; review modal opens separately
       return
     }
 
-    alert(`Unsupported file type: .${ext}\nPlease upload CSV, Excel, PDF, JPG, or PNG.`)
-  }
+    // ── Image (JPG, PNG, WEBP, etc.) ──────────────────────────────────────────
+    if (['jpg','jpeg','png','webp','gif','bmp','tiff'].includes(ext)) {
+      setProcessingMsg('Preparing image…')
+      setProcessingPct(20)
 
-  // ── Approve CSV/Excel multi-row import ──────────────────────────────────────
-  const approveMultiImport = () => {
-    const base = nextId(finance)
-    const records = importRows
-      .filter(r => r.approved && r.amount > 0)
-      .map((r, i) => ({
-        id:            base + i,
-        date:          r.date || today(),
-        type:          r.type,
-        category:      r.category,
-        description:   r.description,
-        amount:        r.amount,
-        supplierPayee: r.supplierPayee,
+      let docRecord = null
+      if (SUPABASE_CONFIGURED) {
+        try {
+          docRecord = await uploadDocument(file, { category: 'Invoices' })
+        } catch (err) {
+          console.warn('[Finance] Upload failed:', err.message)
+        }
+      }
+
+      const previewUrl = URL.createObjectURL(file)
+
+      let extracted = null
+      let ocrUsed   = false
+      let ocrError  = ''
+
+      if (OCR_AVAILABLE) {
+        try {
+          setProcessingMsg('Reading image with AI…')
+          setProcessingPct(60)
+          extracted = await extractViaBackend(file, '')
+          ocrUsed   = true
+        } catch (err) {
+          ocrError = err.message === 'OCR_NOT_CONFIGURED'
+            ? 'AI extraction not configured. Add OCR_SECRET_KEY to Vercel.'
+            : `AI reading failed: ${err.message}`
+        }
+      }
+
+      const classified = extracted
+        ? classifyText((extracted.supplierName || '') + ' ' + (extracted.description || ''), extracted.totalAmount)
+        : { type: 'Business Expense', category: 'Other Expense', confidence: 'Needs Review' }
+      if (extracted?.confidence) classified.confidence = extracted.confidence
+
+      const rf = {
+        date:          extracted?.invoiceDate || today(),
+        type:          extracted?.suggestedType     || classified.type,
+        category:      extracted?.suggestedCategory || classified.category,
+        description:   extracted?.description || extracted?.supplierName || '',
+        amount:        String(extracted?.totalAmount || ''),
+        supplierPayee: extracted?.supplierName || '',
         paymentMethod: 'EFT',
-        invoiceNumber: r.invoiceNumber || '',
-        vatAmount:     r.vatAmount || 0,
-        sourceFile:    importMeta.fileName,
-        source:        'import',
-        notes:         `Auto-imported · ${r.confidence}`,
-      }))
-    setFinance(ff => [...ff, ...records])
-    setImportWizard(false)
-    setImportRows([])
+        invoiceNumber: extracted?.invoiceNumber || '',
+        vatAmount:     String(extracted?.vatAmount || ''),
+        notes:         ocrUsed ? `AI Vision extraction · ${classified.confidence}` : 'Manual review required — AI not connected',
+        sourceDocumentId: docRecord?.id || null,
+        sourceFile:       file.name,
+        source:           ocrUsed ? 'ocr' : 'import',
+      }
+
+      setDocReview({ file, docRecord, extracted, classified, previewUrl, rawText: '', ocrUsed, ocrError, isTextBased: false, fileName: file.name })
+      setReviewForm(rf)
+      setReviewErrors({})
+      setProcessingPct(100)
+      setImportStep('review_single')
+      setImportOpen(false)
+      return
+    }
+
+    setImportError(`Unsupported file type: .${ext}. Please use PDF, JPG, PNG, or CSV.`)
     setImportStep('upload')
-  }
+  }, [])
 
-  // ── Approve single-doc review ────────────────────────────────────────────────
-  const [singleForm, setSingleForm] = useState(null)
+  // ── Approve single-document review ───────────────────────────────────────────
+  const approveSingleReview = useCallback(async () => {
+    const errs = validateTxn(reviewForm)
+    if (Object.keys(errs).length) { setReviewErrors(errs); return }
 
-  useEffect(() => {
-    if (singleReview) {
-      const { extracted, classified, fileName } = singleReview
-      setSingleForm({
-        date:          extracted.invoiceDate || today(),
-        type:          classified.type,
-        category:      classified.category,
-        description:   extracted.description || extracted.supplierName,
-        amount:        extracted.totalAmount || '',
-        supplierPayee: extracted.supplierName,
-        paymentMethod: 'EFT',
-        invoiceNumber: extracted.invoiceNumber,
-        vatAmount:     extracted.vatAmount || 0,
-        sourceFile:    fileName,
-        notes:         `${classified.confidence} · OCR: ${singleReview.ocrUsed ? 'Yes' : 'No'}`,
-        source:        'import',
-      })
-    }
-  }, [singleReview])
-
-  const approveSingle = () => {
-    if (!singleForm) return
     const rec = {
-      ...singleForm,
-      id:     nextId(finance),
-      amount: parseFloat(singleForm.amount) || 0,
+      ...BLANK_TXN,
+      ...reviewForm,
+      id:        nextId(Array.isArray(finance) ? finance : []),
+      amount:    parseNum(reviewForm.amount),
+      vatAmount: parseNum(reviewForm.vatAmount),
     }
-    setFinance(ff => [...ff, rec])
-    setSingleReview(null)
-    setSingleForm(null)
+
+    // Save to Supabase if configured
+    if (SUPABASE_CONFIGURED) {
+      try {
+        const dbRec = await insertTransaction(rec)
+        if (docReview?.docRecord?.id && dbRec?.id) {
+          await updateDocumentLink(docReview.docRecord.id, dbRec.id)
+        }
+      } catch (e) {
+        console.warn('[Finance] Supabase save failed, saving locally:', e.message)
+      }
+    }
+
+    setFinance(ff => [...(Array.isArray(ff) ? ff : []), rec])
+    cleanup()
+  }, [reviewForm, finance, setFinance, docReview])
+
+  const cleanup = () => {
+    if (docReview?.previewUrl) URL.revokeObjectURL(docReview.previewUrl)
+    setDocReview(null)
+    setReviewForm(null)
+    setReviewErrors({})
+    setImportStep('upload')
+    setImportError('')
+    setProcessingMsg('')
+    setProcessingPct(0)
   }
 
-  // ── Computed summaries ──────────────────────────────────────────────────────
-  const monthly = {}
-  finance.forEach(t => {
-    const key = t.date ? t.date.substring(0, 7) : 'Unknown'
-    if (!monthly[key]) monthly[key] = { inv: 0, inc: 0, exp: 0 }
-    if (t.type === 'Owner Investment') monthly[key].inv += Number(t.amount)
-    else if (t.type === 'Business Income') monthly[key].inc += Number(t.amount)
-    else monthly[key].exp += Number(t.amount)
-  })
+  // ── Approve CSV rows ─────────────────────────────────────────────────────────
+  const approveCsvRows = useCallback(() => {
+    const approved = csvRows.filter(r => r.approved && r.amount > 0)
+    if (!approved.length) return
+    const base = nextId(Array.isArray(finance) ? finance : [])
+    const records = approved.map((r, i) => ({
+      id:            base + i,
+      date:          r.date || today(),
+      type:          r.type,
+      category:      r.category,
+      description:   r.description,
+      amount:        r.amount,
+      supplierPayee: r.supplierPayee,
+      paymentMethod: 'EFT',
+      invoiceNumber: '',
+      vatAmount:     0,
+      notes:         `CSV import · ${r.confidence} · ${csvMeta.fileName}`,
+      source:        'import',
+      sourceFile:    csvMeta.fileName,
+    }))
+    setFinance(ff => [...(Array.isArray(ff) ? ff : []), ...records])
+    setCsvRows([])
+    setImportStep('upload')
+    setImportOpen(false)
+  }, [csvRows, csvMeta, finance, setFinance])
 
-  const catSummary = {}
-  finance.filter(t => t.type === 'Business Expense').forEach(t => {
-    catSummary[t.category] = (catSummary[t.category] || 0) + Number(t.amount)
-  })
-  const catRows = Object.entries(catSummary).sort((a, b) => b[1] - a[1])
+  const RF = k => e => { setReviewForm(f => ({ ...f, [k]: e.target.value })); setReviewErrors(er => ({ ...er, [k]: undefined })) }
 
-  const topCat = catRows[0]?.[0] || 'No expenses yet'
-  const insight = `Botanica Living Group has received ${ZAR(invested)} in owner investment to date and spent ${ZAR(expenses)}. ${topCat !== 'No expenses yet' ? `The largest expense category is ${topCat}.` : ''} Remaining owner-funded balance is ${ZAR(remaining)}. ${income === 0 ? 'No business income has been recorded yet.' : `Business income to date: ${ZAR(income)}.`} Net business position: ${ZAR(net)}.`
+  // ── AI status explanation ─────────────────────────────────────────────────────
+  const ocrStatusNote = () => {
+    if (!OCR_AVAILABLE) return {
+      color: T.textMid,
+      text: 'Document uploaded and stored. Automatic reading is not connected yet. Please capture fields manually from the preview.',
+    }
+    return { color: T.green, text: 'AI extraction is enabled. Fields have been pre-filled — please review and correct before saving.' }
+  }
 
-  const visibleTxns = filterType === 'All' ? finance : finance.filter(t => t.type === filterType)
-  const sorted      = [...visibleTxns].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-
-  const SF = k => e => setSingleForm(f => ({ ...f, [k]: e.target.value }))
+  // ── Insight text ─────────────────────────────────────────────────────────────
+  const topCat  = catSummary[0]?.[0] || 'no expenses yet'
+  const insight = `Botanica has received ${ZAR(invested)} in owner investment and spent ${ZAR(expenses)}. ` +
+    `${topCat !== 'no expenses yet' ? `Largest expense category: ${topCat}. ` : ''}` +
+    `Remaining owner-funded balance: ${ZAR(remaining)}. ` +
+    (income === 0 ? 'No business income recorded yet.' : `Business income to date: ${ZAR(income)}.`)
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div>
-      {/* ── Page Header ─────────────────────────────────────────────────────── */}
+      {/* ── Page header ── */}
       <div className="page-header">
         <div>
           <div className="page-title">Finance Centre</div>
@@ -508,31 +527,36 @@ export default function FinanceCentre({ finance, setFinance }) {
           <button className="btn btn-primary" onClick={openNew}>+ Add Manual Transaction</button>
           <button
             className="btn btn-outline"
-            style={{ borderColor: T.gold, color: T.forest }}
-            onClick={() => { setImportStep('upload'); setImportWizard(true) }}
+            style={{ borderColor:T.gold, color:T.forest }}
+            onClick={() => { setImportStep('upload'); setImportError(''); setImportOpen(true) }}
           >
-            ⬆ Auto Import from Document
+            ⬆ Import from Document
           </button>
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp" style={{ display:'none' }} onChange={handleFileSelected} />
+          <input
+            ref={fileRef} type="file"
+            accept=".csv,.tsv,.pdf,.jpg,.jpeg,.png,.webp,.bmp"
+            style={{ display:'none' }}
+            onChange={handleFileSelected}
+          />
         </div>
       </div>
 
-      {/* ── KPI Bar ─────────────────────────────────────────────────────────── */}
-      <div style={{ padding:'18px 36px 0', background: T.white, borderBottom:`1px solid ${T.beigeDeep}` }}>
-        <div className="grid-5" style={{ paddingBottom: 18 }}>
+      {/* ── KPI Bar ── */}
+      <div style={{ background:'rgba(255,255,255,0.55)', backdropFilter:'blur(16px)', borderBottom:`1px solid rgba(210,200,184,0.5)`, padding:'16px 36px' }}>
+        <div className="grid-5">
           {[
-            { label:'Owner Investment', val: ZAR(invested),  color: T.teal,   cls:'fin-kpi-inv' },
-            { label:'Business Income',  val: ZAR(income),    color: T.green,  cls:'fin-kpi-inc' },
-            { label:'Total Expenses',   val: ZAR(expenses),  color: T.red,    cls:'fin-kpi-exp' },
-            { label:'Remaining Funds',  val: ZAR(remaining), color: T.gold,   cls:'fin-kpi-rem' },
-            { label:'Net Position',     val: ZAR(net),       color: net >= 0 ? T.forest : T.danger, cls:'fin-kpi-net' },
+            { label:'Owner Investment', val:ZAR(invested),  color:T.teal,   cls:'border-inv' },
+            { label:'Business Income',  val:ZAR(income),    color:T.green,  cls:'border-inc' },
+            { label:'Total Expenses',   val:ZAR(expenses),  color:T.red,    cls:'border-exp' },
+            { label:'Cash Position',    val:ZAR(remaining), color:remaining >= 0 ? T.gold : T.danger, cls:'border-rem' },
+            { label:'Net Position',     val:ZAR(net),       color:net >= 0 ? T.forestLight : T.danger, cls:'border-net' },
           ].map(k => (
             <div key={k.label} className={`stat-card ${k.cls}`}>
-              <div className="card-label">{k.label}</div>
+              <div className="stat-label">{k.label}</div>
               <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:k.color, lineHeight:1, marginTop:6 }}>{k.val}</div>
-              {k.label === 'Remaining Funds' && invested > 0 && (
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width:`${Math.min(100, Math.max(0, (remaining/invested)*100))}%` }} />
+              {k.cls === 'border-rem' && invested > 0 && (
+                <div className="pbar" style={{ marginTop:8 }}>
+                  <div className="pbar-fill pbar-gold" style={{ width:`${Math.min(100, Math.max(0,(remaining/invested)*100))}%` }} />
                 </div>
               )}
             </div>
@@ -540,8 +564,10 @@ export default function FinanceCentre({ finance, setFinance }) {
         </div>
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────────────────────── */}
+      {/* ── Tabs + content ── */}
       <div className="page-content">
+        <ConnectionNotice />
+
         <div className="tabs">
           {['overview','transactions','monthly','categories'].map(t => (
             <div key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>
@@ -550,23 +576,23 @@ export default function FinanceCentre({ finance, setFinance }) {
           ))}
         </div>
 
-        {/* ── Overview ──────────────────────────────────────────────────────── */}
+        {/* ── Overview ── */}
         {tab === 'overview' && (
-          <div className="grid-2 gap-16">
+          <div className="grid-2 gap-20">
             <div className="insight-box">
-              <div className="insight-label">AI-Style Finance Insight</div>
+              <div className="insight-tag">Finance Insight</div>
               <div className="insight-text">{insight}</div>
             </div>
-            <div className="card">
-              <div className="section-label">Project-to-Date Summary</div>
+            <div className="g-card">
+              <div className="sec-label">Project-to-Date</div>
               {[
-                { label:'Total Owner Investment', val:ZAR(invested),  color:T.teal },
-                { label:'Total Business Income',  val:ZAR(income),    color:T.green },
-                { label:'Total Expenses',         val:ZAR(expenses),  color:T.red },
-                { label:'Remaining Owner Funds',  val:ZAR(remaining), color:T.gold },
-                { label:'Net Business Position',  val:ZAR(net),       color:net >= 0 ? T.forest : T.danger },
+                { label:'Owner Investment', val:ZAR(invested),  color:T.teal },
+                { label:'Business Income',  val:ZAR(income),    color:T.green },
+                { label:'Total Expenses',   val:ZAR(expenses),  color:T.red },
+                { label:'Cash Position',    val:ZAR(remaining), color:remaining >= 0 ? T.gold : T.danger },
+                { label:'Net Position',     val:ZAR(net),       color:net >= 0 ? T.forestLight : T.danger },
               ].map(r => (
-                <div key={r.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0', borderBottom:`1px solid ${T.beige}` }}>
+                <div key={r.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0', borderBottom:`1px solid rgba(210,200,184,0.35)` }}>
                   <span style={{ fontSize:13, color:T.textMid }}>{r.label}</span>
                   <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:r.color }}>{r.val}</span>
                 </div>
@@ -575,116 +601,105 @@ export default function FinanceCentre({ finance, setFinance }) {
           </div>
         )}
 
-        {/* ── Transactions ──────────────────────────────────────────────────── */}
+        {/* ── Transactions ── */}
         {tab === 'transactions' && (
           <>
-            <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:7, marginBottom:16, flexWrap:'wrap' }}>
               {['All','Owner Investment','Business Income','Business Expense'].map(t => (
-                <button key={t} className={`btn btn-sm ${filterType===t?'btn-primary':'btn-outline'}`} onClick={() => setFilterType(t)}>{t}</button>
+                <button key={t} className={`bp-fbtn ${filterType===t?'active':''}`} onClick={() => setFilterType(t)}>{t}</button>
               ))}
             </div>
-            {sorted.length === 0
-              ? (
-                <div className="empty-state">
-                  <div className="empty-icon">₩</div>
-                  <div>No transactions yet.</div>
-                  <div style={{ marginTop:12, display:'flex', gap:10, justifyContent:'center' }}>
-                    <button className="btn btn-primary btn-sm" onClick={openNew}>Add Manual Transaction</button>
-                    <button className="btn btn-outline btn-sm" onClick={() => { setImportStep('upload'); setImportWizard(true) }}>Import from Document</button>
-                  </div>
+            {visibleTxns.length === 0 ? (
+              <div className="empty-st">
+                <div className="empty-ic">₩</div>
+                <div>No transactions yet.</div>
+                <div style={{ marginTop:12, display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+                  <button className="btn btn-primary btn-sm" onClick={openNew}>Add Manual Transaction</button>
+                  <button className="btn btn-outline btn-sm" onClick={() => { setImportStep('upload'); setImportOpen(true) }}>Import from Document</button>
                 </div>
-              ) : (
-                <div className="card" style={{ padding:0 }}>
-                  <div className="table-wrap">
-                    <table>
-                      <thead>
-                        <tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Payee</th><th>Inv #</th><th>Amount</th><th>Source</th><th></th></tr>
-                      </thead>
-                      <tbody>
-                        {sorted.map(t => (
-                          <tr key={t.id}>
-                            <td style={{ fontSize:12, whiteSpace:'nowrap' }}>{fmtDate(t.date)}</td>
-                            <td>
-                              <span style={{ background:TYPE_BG[t.type], color:TYPE_COLORS[t.type], padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:500, whiteSpace:'nowrap' }}>
-                                {t.type === 'Owner Investment' ? 'Investment' : t.type === 'Business Income' ? 'Income' : 'Expense'}
-                              </span>
-                            </td>
-                            <td style={{ fontSize:12, color:T.textMid }}>{t.category}</td>
-                            <td className="td-name" style={{ fontSize:13, maxWidth:200 }}>{t.description}</td>
-                            <td style={{ fontSize:12, color:T.textLight }}>{t.supplierPayee}</td>
-                            <td style={{ fontSize:11, color:T.textLight, fontFamily:'monospace' }}>{t.invoiceNumber || '—'}</td>
-                            <td style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:TYPE_COLORS[t.type], whiteSpace:'nowrap' }}>{ZAR(t.amount)}</td>
-                            <td>
-                              {t.source === 'import'
-                                ? <span className="badge badge-blue" style={{ fontSize:10 }}>Imported</span>
-                                : <span className="badge badge-grey" style={{ fontSize:10 }}>Manual</span>
-                              }
-                            </td>
-                            <td>
-                              <div style={{ display:'flex', gap:4 }}>
-                                <button className="btn btn-outline btn-xs" onClick={() => openEdit(t)}>Edit</button>
-                                <button className="btn btn-xs" style={{ background:'transparent', border:'none', cursor:'pointer', color:T.textLight }} onClick={() => del(t.id)}>✕</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              </div>
+            ) : (
+              <div className="g-card" style={{ padding:0 }}>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Supplier / Payee</th><th>Inv #</th><th>Amount</th><th>Source</th><th style={{ width:90 }}></th></tr>
+                    </thead>
+                    <tbody>
+                      {visibleTxns.map(t => t && (
+                        <tr key={t.id}>
+                          <td style={{ fontSize:12, whiteSpace:'nowrap' }}>{fmtDate(t.date)}</td>
+                          <td><TypeBadge type={t.type} /></td>
+                          <td style={{ fontSize:12, color:T.textMid }}>{t.category}</td>
+                          <td className="td-wrap" style={{ fontSize:13, maxWidth:200 }}>{t.description}</td>
+                          <td style={{ fontSize:12, color:T.textLight }}>{t.supplierPayee}</td>
+                          <td style={{ fontSize:11, color:T.textLight, fontFamily:'monospace' }}>{t.invoiceNumber || '—'}</td>
+                          <td style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:TYPE_COLORS[t.type], whiteSpace:'nowrap' }}>{ZAR(t.amount)}</td>
+                          <td>
+                            {t.source === 'ocr'    ? <span className="badge badge-teal"  style={{ fontSize:10 }}>AI</span>
+                            :t.source === 'import'  ? <span className="badge badge-blue"  style={{ fontSize:10 }}>Import</span>
+                            :                        <span className="badge badge-grey"  style={{ fontSize:10 }}>Manual</span>}
+                          </td>
+                          <td>
+                            <div style={{ display:'flex', gap:4 }}>
+                              <button className="btn btn-outline btn-xs" onClick={() => openEdit(t)}>Edit</button>
+                              <button className="btn btn-xs btn-ghost" style={{ color:T.textLight }} onClick={() => delTxn(t.id)}>✕</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )
-            }
+              </div>
+            )}
           </>
         )}
 
-        {/* ── Monthly ───────────────────────────────────────────────────────── */}
+        {/* ── Monthly ── */}
         {tab === 'monthly' && (
-          <div className="card" style={{ padding:0 }}>
+          <div className="g-card" style={{ padding:0 }}>
             <div className="table-wrap">
               <table>
-                <thead>
-                  <tr><th>Month</th><th>Owner Investment</th><th>Business Income</th><th>Expenses</th><th>Remaining</th><th>Net</th></tr>
-                </thead>
+                <thead><tr><th>Month</th><th>Investment</th><th>Income</th><th>Expenses</th><th>Cash Pos.</th><th>Net</th></tr></thead>
                 <tbody>
-                  {Object.entries(monthly).sort((a, b) => b[0].localeCompare(a[0])).map(([month, m]) => (
-                    <tr key={month}>
-                      <td className="td-name">{month}</td>
-                      <td style={{ color:T.teal,   fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(m.inv)}</td>
-                      <td style={{ color:T.green,  fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(m.inc)}</td>
-                      <td style={{ color:T.red,    fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(m.exp)}</td>
-                      <td style={{ color:T.gold,   fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(m.inv - m.exp)}</td>
-                      <td style={{ color:(m.inc - m.exp) >= 0 ? T.forest : T.danger, fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(m.inc - m.exp)}</td>
+                  {Object.entries(monthly).sort((a,b)=>b[0].localeCompare(a[0])).map(([m,v]) => (
+                    <tr key={m}>
+                      <td className="td-name">{m}</td>
+                      <td className="td-num" style={{ color:T.teal   }}>{ZAR(v.inv)}</td>
+                      <td className="td-num" style={{ color:T.green  }}>{ZAR(v.inc)}</td>
+                      <td className="td-num" style={{ color:T.red    }}>{ZAR(v.exp)}</td>
+                      <td className="td-num" style={{ color:T.gold   }}>{ZAR(v.inv-v.exp)}</td>
+                      <td className="td-num" style={{ color:(v.inc-v.exp)>=0?T.forestLight:T.danger }}>{ZAR(v.inc-v.exp)}</td>
                     </tr>
                   ))}
-                  {Object.keys(monthly).length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign:'center', padding:32, color:T.textLight }}>No transactions recorded yet.</td></tr>
-                  )}
+                  {Object.keys(monthly).length===0 && <tr><td colSpan={6} style={{ textAlign:'center', padding:32, color:T.textLight }}>No transactions yet.</td></tr>}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* ── Categories ────────────────────────────────────────────────────── */}
+        {/* ── Categories ── */}
         {tab === 'categories' && (
-          <div className="card" style={{ padding:0 }}>
+          <div className="g-card" style={{ padding:0 }}>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Category</th><th>Total Spend</th><th>% of Expenses</th><th>Bar</th></tr></thead>
+                <thead><tr><th>Category</th><th>Total Spend</th><th>% of Expenses</th><th style={{ width:180 }}>Share</th></tr></thead>
                 <tbody>
-                  {catRows.map(([cat, amt]) => (
+                  {catSummary.map(([cat, amt]) => (
                     <tr key={cat}>
                       <td className="td-name">{cat}</td>
-                      <td style={{ color:T.red, fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{ZAR(amt)}</td>
+                      <td className="td-num" style={{ color:T.red }}>{ZAR(amt)}</td>
                       <td style={{ color:T.textMid, fontSize:13 }}>{expenses > 0 ? ((amt/expenses)*100).toFixed(1) : 0}%</td>
-                      <td style={{ width:180 }}>
-                        <div style={{ height:6, background:T.beige, borderRadius:3, overflow:'hidden' }}>
-                          <div style={{ height:'100%', width:`${expenses > 0 ? (amt/expenses)*100 : 0}%`, background:T.gold, borderRadius:3 }} />
+                      <td>
+                        <div className="pbar">
+                          <div className="pbar-fill pbar-gold" style={{ width:`${expenses>0?(amt/expenses)*100:0}%` }} />
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {catRows.length === 0 && <tr><td colSpan={4} style={{ textAlign:'center', padding:32, color:T.textLight }}>No expense categories yet.</td></tr>}
+                  {catSummary.length===0 && <tr><td colSpan={4} style={{ textAlign:'center', padding:32, color:T.textLight }}>No expense categories yet.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -695,193 +710,167 @@ export default function FinanceCentre({ finance, setFinance }) {
       {/* ═══════════════════════════════════════════════════════════════════════
           MODAL 1 — Manual Add / Edit Transaction
       ═══════════════════════════════════════════════════════════════════════ */}
-      <Modal
-        open={modal}
-        onClose={() => setModal(false)}
-        title={editing ? 'Edit Transaction' : 'Add Manual Transaction'}
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => setModal(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={save}>Save Transaction</button>
-          </>
-        }
+      <Modal open={modal} onClose={() => setModal(false)} title={editing != null ? 'Edit Transaction' : 'Add Manual Transaction'}
+        footer={<><button className="btn btn-outline" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={saveTxn}>Save Transaction</button></>}
       >
         <div className="form-grid">
-          <div className="form-field"><label>Date</label><input type="date" value={form.date} onChange={F('date')} /></div>
           <div className="form-field">
-            <label>Transaction Type</label>
-            <select value={form.type} onChange={e => {
-              const type = e.target.value
-              const firstCat = FINANCE_CATEGORIES[type]?.[0] || ''
-              setForm(f => ({ ...f, type, category: firstCat }))
-            }}>
+            <label htmlFor="txn-date">Date</label>
+            <input id="txn-date" type="date" value={form.date} onChange={F('date')} style={{ borderColor:formErrors.date?T.danger:undefined }} />
+            {formErrors.date && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:3 }}>{formErrors.date}</div>}
+          </div>
+          <div className="form-field">
+            <label htmlFor="txn-type">Transaction Type</label>
+            <select id="txn-type" value={form.type} onChange={e => { const t=e.target.value; setForm(f=>({...f,type:t,category:FINANCE_CATEGORIES[t]?.[0]||''})) }}>
               {Object.keys(FINANCE_CATEGORIES).map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="form-field">
-            <label>Category</label>
-            <select value={form.category} onChange={F('category')}>
-              {(FINANCE_CATEGORIES[form.type] || []).map(c => <option key={c}>{c}</option>)}
+            <label htmlFor="txn-cat">Category</label>
+            <select id="txn-cat" value={form.category} onChange={F('category')}>
+              {(FINANCE_CATEGORIES[form.type]||[]).map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div className="form-field">
-            <label>Amount (ZAR)</label>
-            <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={F('amount')} />
+            <label htmlFor="txn-amt">Amount (ZAR) <span style={{ color:T.danger }}>*</span></label>
+            <input id="txn-amt" type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={F('amount')} style={{ borderColor:formErrors.amount?T.danger:undefined }} />
+            {formErrors.amount && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:3 }}>{formErrors.amount}</div>}
           </div>
           <div className="form-field full">
-            <label>Description</label>
-            <input value={form.description} onChange={F('description')} placeholder="e.g. Domain registration at Domains.co.za" />
+            <label htmlFor="txn-desc">Description <span style={{ color:T.danger }}>*</span></label>
+            <input id="txn-desc" value={form.description} onChange={F('description')} placeholder="e.g. Domain registration at Domains.co.za" style={{ borderColor:formErrors.description?T.danger:undefined }} />
+            {formErrors.description && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:3 }}>{formErrors.description}</div>}
           </div>
-          <div className="form-field"><label>Supplier / Payee</label><input value={form.supplierPayee} onChange={F('supplierPayee')} /></div>
+          <div className="form-field"><label htmlFor="txn-sup">Supplier / Payee</label><input id="txn-sup" value={form.supplierPayee} onChange={F('supplierPayee')} /></div>
           <div className="form-field">
-            <label>Payment Method</label>
-            <select value={form.paymentMethod} onChange={F('paymentMethod')}>
+            <label htmlFor="txn-pm">Payment Method</label>
+            <select id="txn-pm" value={form.paymentMethod} onChange={F('paymentMethod')}>
               {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
-          <div className="form-field"><label>Invoice Number (optional)</label><input value={form.invoiceNumber || ''} onChange={F('invoiceNumber')} placeholder="INV-001" /></div>
-          <div className="form-field"><label>VAT Amount (optional)</label><input type="text" inputMode="decimal" value={form.vatAmount || ''} onChange={F('vatAmount')} placeholder="0.00" /></div>
-          <div className="form-field full"><label>Notes</label><textarea value={form.notes} onChange={F('notes')} /></div>
+          <div className="form-field"><label htmlFor="txn-inv">Invoice Number</label><input id="txn-inv" value={form.invoiceNumber||''} onChange={F('invoiceNumber')} placeholder="INV-001" /></div>
+          <div className="form-field"><label htmlFor="txn-vat">VAT Amount (ZAR)</label><input id="txn-vat" type="text" inputMode="decimal" value={form.vatAmount||''} onChange={F('vatAmount')} placeholder="0" /></div>
+          <div className="form-field full"><label htmlFor="txn-notes">Notes</label><textarea id="txn-notes" value={form.notes} onChange={F('notes')} /></div>
         </div>
       </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          MODAL 2 — Import Wizard  (upload / processing / CSV review)
+          MODAL 2 — Import Wizard (upload + processing + CSV review)
       ═══════════════════════════════════════════════════════════════════════ */}
-      <Modal
-        open={importWizard}
-        onClose={() => { setImportWizard(false); setImportStep('upload'); setImportRows([]) }}
-        title="Auto Import from Document"
-        size="modal-lg"
-        footer={
-          importStep === 'review' ? (
-            <>
-              <button className="btn btn-outline" onClick={() => { setImportWizard(false); setImportRows([]) }}>Cancel</button>
-              <button className="btn btn-outline btn-sm" onClick={() => setImportRows(rows => rows.map(r => ({ ...r, approved: true })))}>Approve All</button>
-              <button className="btn btn-primary" onClick={approveMultiImport}>
-                Save Approved ({importRows.filter(r => r.approved).length})
-              </button>
-            </>
-          ) : null
-        }
+      <Modal open={importOpen} onClose={() => { setImportOpen(false); if (importStep !== 'review_csv') cleanup() }}
+        title="Import from Document" size="modal-lg"
+        footer={importStep === 'review_csv' ? (
+          <>
+            <button className="btn btn-outline" onClick={() => { setImportOpen(false); setCsvRows([]); setImportStep('upload') }}>Cancel</button>
+            <button className="btn btn-outline btn-sm" onClick={() => setCsvRows(r => r.map(x => ({...x,approved:true})))}>Approve All</button>
+            <button className="btn btn-primary" onClick={approveCsvRows}>
+              Save {csvRows.filter(r=>r.approved).length} Transactions
+            </button>
+          </>
+        ) : null}
       >
-        {/* ── Step: Upload ── */}
+        {/* Upload step */}
         {importStep === 'upload' && (
           <div>
-            <div style={{ background: T.goldPale, borderRadius:10, padding:'14px 18px', marginBottom:20, fontSize:13, color:'#5a4010' }}>
-              <strong>Supported formats:</strong> CSV bank statement · Excel (.xlsx) · PDF invoice · JPG / PNG receipt
-            </div>
-
-            {importMeta.ocrNote && (
-              <div style={{ background:'rgba(139,58,58,0.08)', border:`1px solid rgba(139,58,58,0.2)`, borderRadius:10, padding:'12px 16px', marginBottom:20, fontSize:13, color:T.danger }}>
-                ⚠ {importMeta.ocrNote}
+            {!SUPABASE_CONFIGURED && (
+              <div style={{ background:T.goldPale, border:`1px solid rgba(184,151,90,0.22)`, borderRadius:10, padding:'11px 15px', marginBottom:16, fontSize:12, color:'#6B4E10' }}>
+                ℹ Cloud storage not connected. Files will be previewed locally without permanent storage.
               </div>
             )}
-
-            {/* Drop zone */}
+            {importError && (
+              <div style={{ background:T.redPale, border:`1px solid rgba(185,28,28,0.2)`, borderRadius:10, padding:'11px 15px', marginBottom:16, fontSize:12, color:T.danger }}>
+                ⚠ {importError}
+              </div>
+            )}
+            {!OCR_AVAILABLE && (
+              <div style={{ background:'rgba(161,161,170,0.1)', border:`1px solid rgba(161,161,170,0.2)`, borderRadius:10, padding:'11px 15px', marginBottom:16, fontSize:12, color:T.textMid }}>
+                <strong>Manual review mode:</strong> AI extraction is not connected. You can upload any document — it will be previewed so you can capture fields manually. To enable automatic AI extraction, add <code>VITE_OCR_API_KEY</code> and <code>OCR_SECRET_KEY</code> to your environment variables.
+              </div>
+            )}
             <div
-              style={{ border:`2px dashed ${T.beigeDeep}`, borderRadius:12, padding:'48px 24px', textAlign:'center', cursor:'pointer', transition:'border-color 0.15s' }}
+              style={{ border:`2px dashed rgba(210,200,184,0.7)`, borderRadius:14, padding:'44px 24px', textAlign:'center', cursor:'pointer' }}
               onClick={() => fileRef.current?.click()}
               onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const dt = new DataTransfer(); dt.items.add(f); fileRef.current.files = dt.files; handleFileSelected({ target: fileRef.current }) } }}
+              onDrop={e => { e.preventDefault(); const f=e.dataTransfer.files[0]; if(f){ const dt=new DataTransfer(); dt.items.add(f); fileRef.current.files=dt.files; handleFileSelected({target:fileRef.current}) } }}
             >
-              <div style={{ fontSize:40, marginBottom:12, color:T.beigeDeep }}>📄</div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.forest, marginBottom:8 }}>Drop file here or click to browse</div>
-              <div style={{ fontSize:12, color:T.textLight }}>PDF · Image · CSV · Excel</div>
+              <div style={{ fontSize:36, opacity:0.35, marginBottom:12 }}>📄</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.forest, marginBottom:6 }}>Drop a file or click to browse</div>
+              <div style={{ fontSize:12, color:T.textLight }}>PDF · Image · CSV</div>
               <button className="btn btn-primary" style={{ marginTop:16 }} onClick={e => { e.stopPropagation(); fileRef.current?.click() }}>Choose File</button>
             </div>
-
-            <div style={{ marginTop:20, background:T.beige, borderRadius:10, padding:'14px 18px' }}>
-              <div style={{ fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', color:T.gold, fontWeight:600, marginBottom:10 }}>What happens after upload</div>
+            <div style={{ marginTop:18, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               {[
-                { icon:'📊', label:'CSV / Excel', desc:'All rows extracted and auto-classified. Review and approve each line.' },
-                { icon:'📄', label:'Text PDF (invoice/quote)', desc:'Supplier, date, amount and VAT extracted. Single transaction review.' },
-                { icon:'🖼', label:'Scanned PDF / Image receipt', desc:'OCR reads the document. Review extracted data before saving.' },
+                { icon:'📊', label:'CSV / Bank Statement', desc:'All rows reviewed before saving' },
+                { icon:'📄', label:'Text PDF / Invoice',   desc:'Fields extracted from PDF text' },
+                { icon:'🖼', label:'Image / Scanned PDF',  desc: OCR_AVAILABLE ? 'AI Vision reads the document' : 'Manual field entry from preview' },
               ].map(r => (
-                <div key={r.label} style={{ display:'flex', gap:12, padding:'8px 0', borderBottom:`1px solid ${T.beigeDeep}` }}>
-                  <span style={{ fontSize:18 }}>{r.icon}</span>
-                  <div>
-                    <div style={{ fontWeight:500, fontSize:13 }}>{r.label}</div>
-                    <div style={{ fontSize:12, color:T.textMid }}>{r.desc}</div>
-                  </div>
+                <div key={r.label} style={{ background:'rgba(228,221,208,0.4)', borderRadius:10, padding:'12px 14px' }}>
+                  <div style={{ fontSize:18, marginBottom:6 }}>{r.icon}</div>
+                  <div style={{ fontWeight:600, fontSize:12, color:T.forest, marginBottom:3 }}>{r.label}</div>
+                  <div style={{ fontSize:11, color:T.textMid }}>{r.desc}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Step: Processing ── */}
+        {/* Processing step */}
         {importStep === 'processing' && (
-          <div style={{ textAlign:'center', padding:'40px 20px' }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>⏳</div>
-            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:T.forest, marginBottom:8 }}>
-              {processingMsg || 'Processing document…'}
-            </div>
-            <div style={{ maxWidth:320, margin:'0 auto' }}>
-              <div style={{ height:6, background:T.beige, borderRadius:3, overflow:'hidden', marginTop:16 }}>
-                <div style={{ height:'100%', width:`${processingPct}%`, background:`linear-gradient(90deg,${T.gold},${T.goldLight})`, borderRadius:3, transition:'width 0.3s' }} />
+          <div style={{ textAlign:'center', padding:'48px 20px' }}>
+            <div style={{ fontSize:44, marginBottom:14 }}>⏳</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.forest, marginBottom:12 }}>{processingMsg || 'Processing…'}</div>
+            <div style={{ maxWidth:300, margin:'0 auto' }}>
+              <div className="pbar" style={{ height:6 }}>
+                <div className="pbar-fill pbar-gold" style={{ width:`${processingPct}%`, transition:'width 0.3s' }} />
               </div>
               <div style={{ fontSize:12, color:T.textLight, marginTop:8 }}>{processingPct}%</div>
             </div>
           </div>
         )}
 
-        {/* ── Step: CSV/Excel Multi-row Review ── */}
-        {importStep === 'review' && (
+        {/* CSV multi-row review */}
+        {importStep === 'review_csv' && (
           <div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, flexWrap:'wrap', gap:8 }}>
               <div style={{ fontSize:13, color:T.textMid }}>
-                <strong>{importMeta.fileName}</strong> · {importRows.length} rows found · {importRows.filter(r => r.approved).length} approved
+                <strong>{csvMeta.fileName}</strong> · {csvRows.length} rows · {csvRows.filter(r=>r.approved).length} approved
               </div>
               <div style={{ display:'flex', gap:6 }}>
-                <button className="btn btn-outline btn-xs" onClick={() => setImportRows(rows => rows.map(r => ({ ...r, approved: true })))}>All ✓</button>
-                <button className="btn btn-outline btn-xs" onClick={() => setImportRows(rows => rows.map(r => ({ ...r, approved: false })))}>None</button>
+                <button className="btn btn-outline btn-xs" onClick={() => setCsvRows(r => r.map(x=>({...x,approved:true})))}>All ✓</button>
+                <button className="btn btn-outline btn-xs" onClick={() => setCsvRows(r => r.map(x=>({...x,approved:false})))}>None</button>
               </div>
             </div>
-            {importMeta.ocrNote && (
-              <div style={{ background:T.goldPale, borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:12, color:'#5a4010' }}>ℹ {importMeta.ocrNote}</div>
-            )}
             <div className="table-wrap">
               <table>
-                <thead>
-                  <tr><th>✓</th><th>Date</th><th>Description</th><th>Amount</th><th>Payee</th><th>Type</th><th>Category</th><th>Conf.</th></tr>
-                </thead>
+                <thead><tr><th>✓</th><th>Date</th><th>Description</th><th>Amount</th><th>Payee</th><th>Type</th><th>Category</th><th>Conf.</th></tr></thead>
                 <tbody>
-                  {importRows.map((row, i) => (
-                    <tr key={row._id} style={{ opacity: row.approved ? 1 : 0.35 }}>
-                      <td>
-                        <input type="checkbox" checked={row.approved} onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, approved: e.target.checked } : r))} />
-                      </td>
+                  {csvRows.map((row, i) => (
+                    <tr key={row._id} style={{ opacity:row.approved?1:0.35 }}>
+                      <td><input type="checkbox" checked={row.approved} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,approved:e.target.checked}:x))} /></td>
                       <td style={{ fontSize:12 }}>
-                        <input type="date" value={row.date} style={{ width:130, fontSize:11, padding:'2px 4px' }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, date: e.target.value } : r))} />
+                        <input type="date" value={row.date} style={{ width:130, fontSize:11, padding:'2px 5px' }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,date:e.target.value}:x))} />
                       </td>
-                      <td style={{ fontSize:12, maxWidth:180 }}>
-                        <input value={row.description} style={{ fontSize:11, padding:'2px 4px', width:'100%' }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, description: e.target.value } : r))} />
-                      </td>
-                      <td style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:15, whiteSpace:'nowrap' }}>
-                        <input type="number" value={row.amount} style={{ width:90, fontSize:12, padding:'2px 4px', fontFamily:'inherit' }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, amount: parseFloat(e.target.value)||0 } : r))} />
-                      </td>
-                      <td style={{ fontSize:12 }}>
-                        <input value={row.supplierPayee} style={{ fontSize:11, padding:'2px 4px', width:100 }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, supplierPayee: e.target.value } : r))} />
+                      <td style={{ minWidth:160 }}>
+                        <input value={row.description} style={{ fontSize:11, padding:'2px 5px', width:'100%' }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,description:e.target.value}:x))} />
                       </td>
                       <td>
-                        <select value={row.type} style={{ fontSize:11, padding:'2px 4px' }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, type: e.target.value, category: FINANCE_CATEGORIES[e.target.value]?.[0] || '' } : r))}>
+                        <input type="text" inputMode="decimal" value={String(row.amount)} style={{ width:80, fontSize:12, padding:'2px 5px' }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,amount:parseFloat(e.target.value)||0}:x))} />
+                      </td>
+                      <td style={{ fontSize:12 }}>
+                        <input value={row.supplierPayee} style={{ fontSize:11, padding:'2px 5px', width:90 }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,supplierPayee:e.target.value}:x))} />
+                      </td>
+                      <td>
+                        <select value={row.type} style={{ fontSize:11, padding:'2px 5px' }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,type:e.target.value,category:FINANCE_CATEGORIES[e.target.value]?.[0]||''}:x))}>
                           {Object.keys(FINANCE_CATEGORIES).map(t => <option key={t}>{t}</option>)}
                         </select>
                       </td>
                       <td>
-                        <select value={row.category} style={{ fontSize:11, padding:'2px 4px' }}
-                          onChange={e => setImportRows(rows => rows.map((r, j) => j === i ? { ...r, category: e.target.value } : r))}>
-                          {(FINANCE_CATEGORIES[row.type] || []).map(c => <option key={c}>{c}</option>)}
+                        <select value={row.category} style={{ fontSize:11, padding:'2px 5px' }} onChange={e => setCsvRows(r => r.map((x,j)=>j===i?{...x,category:e.target.value}:x))}>
+                          {(FINANCE_CATEGORIES[row.type]||[]).map(c => <option key={c}>{c}</option>)}
                         </select>
                       </td>
                       <td>
-                        <span style={{ fontSize:10, fontWeight:500, color: CONF_COLOR[row.confidence] || T.textMid }}>
+                        <span style={{ fontSize:10, fontWeight:600, color:CONF_COLORS[row.confidence]||T.textMid }}>
                           {row.confidence === 'High Confidence' ? '★★★' : row.confidence === 'Medium Confidence' ? '★★☆' : '★☆☆'}
                         </span>
                       </td>
@@ -896,104 +885,138 @@ export default function FinanceCentre({ finance, setFinance }) {
 
       {/* ═══════════════════════════════════════════════════════════════════════
           MODAL 3 — Single Document Review (PDF / Image)
+          Split: preview left, form right
       ═══════════════════════════════════════════════════════════════════════ */}
-      <Modal
-        open={!!singleReview && !!singleForm}
-        onClose={() => { setSingleReview(null); setSingleForm(null) }}
-        title="Review Extracted Transaction"
-        size="modal-lg"
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => { setSingleReview(null); setSingleForm(null) }}>Reject</button>
-            <button className="btn btn-primary" onClick={approveSingle}>Approve & Save Transaction</button>
-          </>
-        }
-      >
-        {singleReview && singleForm && (
-          <div>
-            {/* File info + OCR note */}
-            <div style={{ background:T.beige, borderRadius:10, padding:'12px 16px', marginBottom:18, display:'flex', alignItems:'center', gap:12 }}>
-              <span style={{ fontSize:24 }}>{singleReview.ocrUsed ? '🖼' : '📄'}</span>
-              <div>
-                <div style={{ fontWeight:500, fontSize:13 }}>{singleReview.fileName}</div>
-                <div style={{ fontSize:11, color:T.textMid }}>
-                  {singleReview.ocrUsed ? 'Read via OCR — please verify all fields carefully.' : 'Text extracted from PDF — verify before saving.'}
-                  {' '}Confidence: <span style={{ color: CONF_COLOR[singleReview.classified?.confidence] || T.textMid, fontWeight:600 }}>{singleReview.classified?.confidence}</span>
+      {docReview && reviewForm && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cleanup()}>
+          <div
+            className="modal"
+            style={{ width:'min(96vw, 1100px)', maxHeight:'96vh', padding:0, display:'flex', flexDirection:'column' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding:'18px 24px', borderBottom:`1px solid rgba(210,200,184,0.5)`, display:'flex', alignItems:'center', gap:14, flexShrink:0 }}>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.forest, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                Review: {docReview.fileName}
+              </div>
+              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                <span style={{ fontSize:11, color:CONF_COLORS[docReview.classified?.confidence]||T.textMid, fontWeight:700, alignSelf:'center' }}>
+                  {docReview.classified?.confidence || 'Needs Review'}
+                </span>
+                <button className="modal-close" onClick={cleanup}>✕</button>
+              </div>
+            </div>
+
+            {/* OCR / extraction status */}
+            <div style={{ padding:'10px 24px', background: docReview.ocrUsed ? T.greenPale : 'rgba(228,221,208,0.5)', borderBottom:`1px solid rgba(210,200,184,0.4)`, fontSize:12, color: docReview.ocrUsed ? T.green : T.textMid, flexShrink:0 }}>
+              {docReview.ocrUsed
+                ? `✓ AI extracted data from this document. Review and correct the fields on the right before saving.`
+                : docReview.isTextBased
+                  ? `📄 Text extracted from PDF using pdf.js. Fields pre-filled using pattern matching — please verify accuracy.`
+                  : ocrStatusNote().text
+              }
+              {docReview.ocrError && (
+                <span style={{ color:T.danger, marginLeft:8 }}>⚠ {docReview.ocrError}</span>
+              )}
+            </div>
+
+            {/* Body: preview + form */}
+            <div style={{ flex:1, display:'flex', overflow:'hidden', minHeight:0 }}>
+
+              {/* Preview panel */}
+              <div style={{ flex:1, overflow:'auto', padding:16, borderRight:`1px solid rgba(210,200,184,0.4)`, display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ fontSize:10, letterSpacing:'0.16em', textTransform:'uppercase', color:T.gold, fontWeight:700 }}>Document Preview</div>
+                {docReview.previewUrl && (docReview.file.type === 'application/pdf' || docReview.fileName.endsWith('.pdf')) ? (
+                  <iframe
+                    src={docReview.previewUrl}
+                    title="Document preview"
+                    style={{ flex:1, width:'100%', minHeight:400, border:'none', borderRadius:8 }}
+                  />
+                ) : docReview.previewUrl ? (
+                  <img src={docReview.previewUrl} alt="Document preview" style={{ maxWidth:'100%', borderRadius:8, boxShadow:'0 2px 12px rgba(0,0,0,0.1)' }} />
+                ) : (
+                  <div className="empty-st"><div className="empty-ic">📄</div><div>Preview not available</div></div>
+                )}
+
+                {/* Raw extracted text */}
+                {docReview.rawText && (
+                  <details>
+                    <summary style={{ fontSize:11, color:T.textLight, cursor:'pointer', userSelect:'none' }}>Show extracted text</summary>
+                    <pre style={{ fontSize:10, color:T.textMid, background:'rgba(228,221,208,0.4)', borderRadius:8, padding:10, maxHeight:140, overflow:'auto', fontFamily:'monospace', lineHeight:1.5, whiteSpace:'pre-wrap', marginTop:8 }}>
+                      {docReview.rawText.substring(0, 1500)}{docReview.rawText.length > 1500 ? '\n…' : ''}
+                    </pre>
+                  </details>
+                )}
+              </div>
+
+              {/* Review form */}
+              <div style={{ width:340, flexShrink:0, overflow:'auto', padding:20 }}>
+                <div style={{ fontSize:10, letterSpacing:'0.16em', textTransform:'uppercase', color:T.gold, fontWeight:700, marginBottom:14 }}>Transaction Details</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  <div className="form-field">
+                    <label htmlFor="rv-date">Date</label>
+                    <input id="rv-date" type="date" value={reviewForm.date} onChange={RF('date')} style={{ borderColor:reviewErrors.date?T.danger:undefined }} />
+                    {reviewErrors.date && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:2 }}>{reviewErrors.date}</div>}
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-type">Type</label>
+                    <select id="rv-type" value={reviewForm.type} onChange={e => { const t=e.target.value; setReviewForm(f=>({...f,type:t,category:FINANCE_CATEGORIES[t]?.[0]||''})) }}>
+                      {Object.keys(FINANCE_CATEGORIES).map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-cat">Category</label>
+                    <select id="rv-cat" value={reviewForm.category} onChange={RF('category')}>
+                      {(FINANCE_CATEGORIES[reviewForm.type]||[]).map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-amt">Amount (ZAR) <span style={{ color:T.danger }}>*</span></label>
+                    <input id="rv-amt" type="text" inputMode="decimal" value={reviewForm.amount} onChange={RF('amount')} style={{ borderColor:reviewErrors.amount?T.danger:undefined }} />
+                    {reviewErrors.amount && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:2 }}>{reviewErrors.amount}</div>}
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-vat">VAT (ZAR)</label>
+                    <input id="rv-vat" type="text" inputMode="decimal" value={reviewForm.vatAmount||''} onChange={RF('vatAmount')} placeholder="0" />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-inv">Invoice Number</label>
+                    <input id="rv-inv" value={reviewForm.invoiceNumber||''} onChange={RF('invoiceNumber')} />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-sup">Supplier / Payee</label>
+                    <input id="rv-sup" value={reviewForm.supplierPayee||''} onChange={RF('supplierPayee')} />
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-desc">Description <span style={{ color:T.danger }}>*</span></label>
+                    <input id="rv-desc" value={reviewForm.description||''} onChange={RF('description')} style={{ borderColor:reviewErrors.description?T.danger:undefined }} />
+                    {reviewErrors.description && <div role="alert" style={{ fontSize:11, color:T.danger, marginTop:2 }}>{reviewErrors.description}</div>}
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-pm">Payment Method</label>
+                    <select id="rv-pm" value={reviewForm.paymentMethod} onChange={RF('paymentMethod')}>
+                      {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="rv-notes">Notes</label>
+                    <textarea id="rv-notes" value={reviewForm.notes||''} onChange={RF('notes')} style={{ minHeight:50 }} />
+                  </div>
+                  <div style={{ fontSize:11, color:T.textLight }}>
+                    Source: <strong style={{ color:T.forest }}>{reviewForm.sourceFile}</strong>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-              <div className="form-field">
-                <label>Invoice / Document Date</label>
-                <input type="date" value={singleForm.date} onChange={SF('date')} />
-              </div>
-              <div className="form-field">
-                <label>Transaction Type</label>
-                <select value={singleForm.type} onChange={e => {
-                  const type = e.target.value
-                  setSingleForm(f => ({ ...f, type, category: FINANCE_CATEGORIES[type]?.[0] || '' }))
-                }}>
-                  {Object.keys(FINANCE_CATEGORIES).map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Category</label>
-                <select value={singleForm.category} onChange={SF('category')}>
-                  {(FINANCE_CATEGORIES[singleForm.type] || []).map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Amount (ZAR)</label>
-                <input type="text" inputMode="decimal" value={singleForm.amount} onChange={SF('amount')} />
-              </div>
-              <div className="form-field">
-                <label>VAT Amount (ZAR)</label>
-                <input type="text" inputMode="decimal" value={singleForm.vatAmount || ''} onChange={SF('vatAmount')} placeholder="0.00" />
-              </div>
-              <div className="form-field">
-                <label>Invoice Number</label>
-                <input value={singleForm.invoiceNumber || ''} onChange={SF('invoiceNumber')} />
-              </div>
-              <div className="form-field" style={{ gridColumn:'1/-1' }}>
-                <label>Supplier / Payee</label>
-                <input value={singleForm.supplierPayee || ''} onChange={SF('supplierPayee')} />
-              </div>
-              <div className="form-field" style={{ gridColumn:'1/-1' }}>
-                <label>Description</label>
-                <input value={singleForm.description || ''} onChange={SF('description')} />
-              </div>
-              <div className="form-field">
-                <label>Payment Method</label>
-                <select value={singleForm.paymentMethod} onChange={SF('paymentMethod')}>
-                  {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Source File</label>
-                <input value={singleForm.sourceFile || ''} readOnly style={{ color:T.textLight, background:T.beige }} />
-              </div>
-              <div className="form-field" style={{ gridColumn:'1/-1' }}>
-                <label>Notes</label>
-                <textarea value={singleForm.notes || ''} onChange={SF('notes')} style={{ minHeight:60 }} />
-              </div>
+            {/* Footer */}
+            <div style={{ padding:'14px 24px', borderTop:`1px solid rgba(210,200,184,0.5)`, display:'flex', gap:10, justifyContent:'flex-end', flexShrink:0, flexWrap:'wrap' }}>
+              <button className="btn btn-outline" onClick={cleanup}>Reject</button>
+              <button className="btn btn-primary" onClick={approveSingleReview}>✓ Approve & Save Transaction</button>
             </div>
-
-            {/* Raw extracted text */}
-            {singleReview.rawText && (
-              <details style={{ marginTop:16 }}>
-                <summary style={{ fontSize:11, color:T.textLight, cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' }}>
-                  Show raw extracted text
-                </summary>
-                <div style={{ background:T.beige, borderRadius:8, padding:'10px 14px', marginTop:8, fontSize:11, color:T.textMid, whiteSpace:'pre-wrap', maxHeight:160, overflow:'auto', fontFamily:'monospace', lineHeight:1.6 }}>
-                  {singleReview.rawText.substring(0, 1200)}
-                  {singleReview.rawText.length > 1200 ? '\n…' : ''}
-                </div>
-              </details>
-            )}
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </div>
   )
 }

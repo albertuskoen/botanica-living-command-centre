@@ -1,46 +1,77 @@
-// ── FORMAT HELPERS ─────────────────────────────────────────────────────────────
+// format.js — v1.4 Production hardened
+// All helpers are null/undefined/NaN safe
 
-export const ZAR    = n => n!=null&&!isNaN(n) ? `R\u202F${Number(n).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2})}` : 'R\u202F0.00'
-export const USD    = n => n!=null ? `$${Number(n).toFixed(2)}` : '$0.00'
-export const pct    = n => `${Number(n).toFixed(1)}%`
-export const R2     = (n,d=2) => typeof n==='number' ? n.toFixed(d) : '–'
-export const nextId = arr => arr.length ? Math.max(...arr.map(x=>x.id))+1 : 1
-export const fmtDate = d => d ? new Date(d).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'}) : '–'
-export const today   = () => new Date().toISOString().split('T')[0]
-export const clamp   = (n,lo,hi) => Math.min(hi,Math.max(lo,n))
+// ── Currency / number display ──────────────────────────────────────────────────
+export const ZAR = n => {
+  const v = Number(n)
+  if (n == null || isNaN(v)) return 'R\u202F0.00'
+  return `R\u202F${v.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
-// ── SMART NUMBER INPUT HELPERS ─────────────────────────────────────────────────
-// Bug 3 fix: controlled text inputs that don't fight the user.
-// Usage:
-//   const [raw, setRaw] = useNumericInput(0)          // raw string state
-//   <input value={raw} onChange={e=>setRaw(e.target.value)} onBlur={…} />
-//   const parsed = parseNum(raw)                       // number for calculations
+export const USD = n => {
+  const v = Number(n)
+  if (n == null || isNaN(v)) return '$0.00'
+  return `$${v.toFixed(2)}`
+}
 
-// parseNum: convert raw string → number, return 0 if empty/invalid
+export const pct = n => {
+  const v = Number(n)
+  return `${isNaN(v) ? '0.0' : Math.max(0, Math.min(100, v)).toFixed(1)}%`
+}
+
+export const R2 = (n, d = 2) => {
+  const v = typeof n === 'number' ? n : Number(n)
+  return isNaN(v) ? '–' : v.toFixed(d)
+}
+
+// ── ID generation — safe on empty arrays and arrays with non-numeric ids ───────
+export const nextId = arr => {
+  if (!Array.isArray(arr) || arr.length === 0) return 1
+  const ids = arr.map(x => Number(x?.id)).filter(n => !isNaN(n))
+  return ids.length === 0 ? 1 : Math.max(...ids) + 1
+}
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+export const fmtDate = d => {
+  if (!d) return '–'
+  try {
+    const dt = new Date(d)
+    if (isNaN(dt.getTime())) return '–'
+    return dt.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch { return '–' }
+}
+
+export const today = () => {
+  try { return new Date().toISOString().split('T')[0] }
+  catch { return '2026-01-01' }
+}
+
+export const clamp = (n, lo, hi) => {
+  const v = Number(n)
+  return isNaN(v) ? lo : Math.min(hi, Math.max(lo, v))
+}
+
+// ── Smart number input helpers (Bug 3) ────────────────────────────────────────
+// parseNum: raw input string → number, 0 on empty/invalid
 export const parseNum = str => {
-  if (str === '' || str === null || str === undefined) return 0
-  const n = parseFloat(String(str).replace(/[^0-9.-]/g,''))
+  if (str === '' || str == null) return 0
+  const n = parseFloat(String(str).replace(/[^0-9.-]/g, ''))
   return isNaN(n) ? 0 : n
 }
 
-// fmtNum: format number for display in a text field on blur
-// shows '' when 0 (so field appears empty on focus), otherwise 2dp
-export const fmtNum = (n, allowEmpty=true) => {
+// fmtNum: number → display string for text inputs, '' when 0
+export const fmtNum = (n, allowEmpty = true) => {
   const v = Number(n)
-  if (allowEmpty && v === 0) return ''
-  return isNaN(v) ? '' : v.toFixed(2).replace(/\.00$/,'')
+  if (allowEmpty && (v === 0 || isNaN(v))) return ''
+  return isNaN(v) ? '' : v.toFixed(2).replace(/\.00$/, '')
 }
 
-// A simple hook-like factory: given a raw state value and setter,
-// returns { value, onChange, onBlur } props for an <input>
-export function numProps(raw, setRaw, onBlur) {
-  return {
-    value: raw,
-    onChange: e => setRaw(e.target.value),
-    onBlur: e => {
-      const n = parseNum(e.target.value)
-      setRaw(n === 0 ? '' : String(n))
-      if (onBlur) onBlur(n)
-    },
-  }
+// safeAmount: ensure a stored amount is always a valid finite number
+export const safeAmount = n => {
+  const v = parseFloat(n)
+  return isFinite(v) && !isNaN(v) ? v : 0
 }
+
+// ── String safety ──────────────────────────────────────────────────────────────
+export const safeStr   = (v, fallback = '') => (typeof v === 'string' ? v : String(v ?? fallback))
+export const truncate  = (s, n = 80) => { const str = safeStr(s); return str.length > n ? str.slice(0, n) + '…' : str }
