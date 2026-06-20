@@ -26,6 +26,7 @@ import {
   uploadDocument, insertTransactionCloud, linkDocumentToTransaction,
   saveExtractionToCloud, getDocumentUrl,
 } from '../lib/supabase.js'
+import DocPreview from '../components/DocPreview.jsx'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const IMG_EXT     = new Set(['jpg','jpeg','png','webp','gif','bmp','svg'])
@@ -108,133 +109,6 @@ function CSVTablePreview({ text }) {
           <tbody>{rows.map((r,ri)=><tr key={ri}>{headers.map((_,ci)=><td key={ci} style={{fontSize:12}}>{r[ci]||''}</td>)}</tr>)}</tbody>
         </table>
       </div>
-    </div>
-  )
-}
-
-// ── ReviewPreviewPanel ─────────────────────────────────────────────────────────
-// Identical preview logic to BusinessDocuments.
-// props.preview = { url, ext, idbKey, storagePath, publicUrl, csvText }
-//   url: initial blob URL set immediately on upload (works instantly, may expire)
-//   idbKey, storagePath, publicUrl: used to re-fetch if blob URL is gone
-function ReviewPreviewPanel({ preview, fileName, rawText, resolvePreviewUrl }) {
-  const blobUrlRef               = useRef(null)
-  const [activeUrl, setActiveUrl] = useState(null)
-  const [loading,   setLoading]   = useState(false)
-  const [err,       setErr]       = useState('')
-
-  useEffect(() => {
-    if (!preview) return
-    setErr('')
-
-    // If there's a fresh URL in state (set right after upload), use it immediately
-    if (preview.url) {
-      setActiveUrl(preview.url)
-      return
-    }
-
-    // No url — resolve from IDB then Supabase (same as BusinessDocuments)
-    setLoading(true)
-    resolvePreviewUrl({
-      idbKey:      preview.idbKey      || null,
-      storagePath: preview.storagePath || null,
-      publicUrl:   preview.publicUrl   || null,
-    }).then(({ url, revoke }) => {
-      if (revoke) blobUrlRef.current = url
-      setActiveUrl(url)
-    }).catch(e => {
-      setErr(e.message)
-    }).finally(() => setLoading(false))
-
-    return () => {
-      // Cleanup blob URL when effect re-runs
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current)
-        blobUrlRef.current = null
-      }
-    }
-  }, [preview?.url, preview?.idbKey, preview?.storagePath, preview?.publicUrl]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Cleanup on unmount
-  useEffect(() => () => {
-    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
-  }, [])
-
-  const ext   = (preview?.ext || '').toLowerCase()
-  const isPdf = ext === 'pdf' || fileName?.toLowerCase().endsWith('.pdf')
-  const isImg = IMG_EXT.has(ext)
-
-  return (
-    <div style={{flex:'0 0 55%',overflow:'auto',padding:16,borderRight:`1px solid rgba(210,200,184,0.4)`,display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:T.gold,fontWeight:700}}>
-        Document Preview
-      </div>
-
-      {loading && (
-        <div className="empty-st"><div style={{fontSize:24}}>⏳</div><div>Loading preview…</div></div>
-      )}
-
-      {err && !loading && (
-        <div style={{padding:'10px 14px',background:T.redPale,border:`1px solid rgba(185,28,28,0.2)`,borderRadius:8,fontSize:12,color:T.danger}}>
-          ⚠ {err}
-        </div>
-      )}
-
-      {/* PDF */}
-      {!loading && !err && activeUrl && isPdf && (
-        <iframe
-          src={activeUrl}
-          title={fileName||'Document'}
-          style={{flex:1,width:'100%',minHeight:440,border:'none',borderRadius:8}}
-        />
-      )}
-
-      {/* Image */}
-      {!loading && !err && activeUrl && isImg && (
-        <img
-          src={activeUrl}
-          alt={fileName||'Document'}
-          style={{maxWidth:'100%',borderRadius:8,boxShadow:'0 2px 12px rgba(0,0,0,0.1)'}}
-        />
-      )}
-
-      {/* CSV */}
-      {!loading && !err && preview?.csvText && (
-        <CSVTablePreview text={preview.csvText} />
-      )}
-
-      {/* Other type with URL — show download */}
-      {!loading && !err && activeUrl && !isPdf && !isImg && !preview?.csvText && (
-        <div style={{textAlign:'center',padding:'32px 16px'}}>
-          <div style={{fontSize:36,marginBottom:12,opacity:0.4}}>📎</div>
-          <div style={{fontSize:13,color:T.textMid,marginBottom:16}}>
-            Preview not available for <strong>.{ext}</strong> files.
-          </div>
-          <a href={activeUrl} download={fileName||'document'} className="btn btn-primary btn-sm">
-            ⬇ Download to Open
-          </a>
-        </div>
-      )}
-
-      {/* No URL, no csv, not loading */}
-      {!loading && !err && !activeUrl && !preview?.csvText && (
-        <div className="empty-st">
-          <div className="empty-ic">📄</div>
-          <div>No preview available</div>
-        </div>
-      )}
-
-      {/* Raw text toggle */}
-      {rawText && (
-        <details>
-          <summary style={{fontSize:11,color:T.textLight,cursor:'pointer',userSelect:'none',marginTop:8}}>
-            Show extracted text
-          </summary>
-          <pre style={{fontSize:10,color:T.textMid,background:'rgba(228,221,208,0.4)',borderRadius:8,padding:10,maxHeight:160,overflow:'auto',fontFamily:'monospace',lineHeight:1.5,whiteSpace:'pre-wrap',marginTop:6}}>
-            {rawText.substring(0,1800)}{rawText.length>1800?'\n…':''}
-          </pre>
-        </details>
-      )}
     </div>
   )
 }
@@ -397,67 +271,42 @@ export default function FinanceCentre({ finance, setFinance }) {
 
   const updateCsvRow = (i,k,v) => setCsvRows(rows=>rows.map((r,j)=>j===i?{...r,[k]:v}:r))
 
-  // ── resolvePreviewUrl — IDENTICAL to BusinessDocuments ────────────────────────
-  // IDB first (fast, offline) → Supabase public URL → Supabase signed URL
-  const resolvePreviewUrl = useCallback(async ({ idbKey, storagePath, publicUrl }) => {
-    // 1. IndexedDB
-    if (idbKey) {
-      try {
-        const url = await createObjectURL(idbKey)
-        if (url) return { url, source:'indexeddb', revoke:true }
-      } catch { /* fall through */ }
-    }
-    // 2. Supabase
-    if (SUPABASE_CONFIGURED && (storagePath || publicUrl)) {
-      const result = await getDocumentUrl({
-        id:           idbKey || null,
-        storage_path: storagePath || null,
-        public_url:   publicUrl   || null,
-      })
-      return result
-    }
-    throw new Error('Document not available — not in local cache and Supabase not configured.')
-  }, [])
-
   // ── View source document from transaction row ─────────────────────────────────
   const viewSourceDoc = useCallback(async t => {
     const hasSource = t.sourceDocId || t.sourceStoragePath || t.sourcePublicUrl
     if (!hasSource) { alert('No source document linked to this transaction.'); return }
     try {
-      const { url, revoke } = await resolvePreviewUrl({
-        idbKey:      t.sourceDocId         || null,
-        storagePath: t.sourceStoragePath   || null,
-        publicUrl:   t.sourcePublicUrl     || null,
+      const { url, revoke } = await getDocumentUrl({
+        id:           t.sourceDocId         || null,
+        storage_path: t.sourceStoragePath   || null,
+        public_url:   t.sourcePublicUrl     || null,
       })
       window.open(url, '_blank')
       if (revoke) setTimeout(()=>URL.revokeObjectURL(url), 30000)
     } catch (e) {
       alert(`Cannot open source document: ${e.message}`)
     }
-  }, [resolvePreviewUrl])
+  }, [])
 
   // ── Download source document from transaction row ─────────────────────────────
   const downloadSourceDoc = useCallback(async t => {
-    // Try IDB first
-    if (t.sourceDocId) {
-      const ok = await downloadFileById(t.sourceDocId, t.sourceFile || 'document')
-      if (ok) return
+    try {
+      const { url } = await getDocumentUrl({
+        id:           t.sourceDocId         || null,
+        storage_path: t.sourceStoragePath   || null,
+        public_url:   t.sourcePublicUrl     || null,
+      })
+      const a = document.createElement('a')
+      a.href = url; a.download = t.sourceFile || 'document'; a.target = '_blank'; a.click()
+    } catch (e) {
+      // Fallback to IDB
+      if (t.sourceDocId) {
+        const ok = await downloadFileById(t.sourceDocId, t.sourceFile || 'document')
+        if (ok) return
+      }
+      alert(`Download failed: ${e.message}`)
     }
-    // Fall back to Supabase
-    if (SUPABASE_CONFIGURED && (t.sourceStoragePath || t.sourcePublicUrl)) {
-      try {
-        const { url } = await resolvePreviewUrl({
-          idbKey:      t.sourceDocId       || null,
-          storagePath: t.sourceStoragePath || null,
-          publicUrl:   t.sourcePublicUrl   || null,
-        })
-        const a = document.createElement('a')
-        a.href = url; a.download = t.sourceFile || 'document'; a.click()
-        return
-      } catch (e) { alert(`Download failed: ${e.message}`); return }
-    }
-    alert('Source document not available.')
-  }, [resolvePreviewUrl])
+  }, [])
 
   // ── File import handler ───────────────────────────────────────────────────────
   const handleFileSelected = useCallback(async e => {
@@ -1025,13 +874,25 @@ export default function FinanceCentre({ finance, setFinance }) {
             {/* Split panel */}
             <div style={{flex:1,display:'flex',overflow:'hidden',minHeight:0}}>
 
-              {/* LEFT — preview panel (identical logic to BusinessDocuments) */}
-              <ReviewPreviewPanel
-                preview={reviewPreview}
-                fileName={reviewInfo.fileName}
-                rawText={reviewInfo.rawText}
-                resolvePreviewUrl={resolvePreviewUrl}
-              />
+              {/* LEFT — shared DocPreview component (same as BusinessDocuments) */}
+              <div style={{flex:'0 0 55%',overflow:'auto',padding:16,borderRight:`1px solid rgba(210,200,184,0.4)`}}>
+                <div style={{fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:T.gold,fontWeight:700,marginBottom:12}}>
+                  Document Preview
+                </div>
+                <DocPreview
+                  doc={{
+                    id:           reviewPreview?.idbKey      || null,
+                    supabaseId:   reviewInfo?.supabaseDocId  || null,
+                    storage_path: reviewPreview?.storagePath || null,
+                    public_url:   reviewPreview?.publicUrl   || null,
+                    file_name:    reviewInfo?.fileName        || '',
+                    file_type:    reviewPreview?.ext          || '',
+                  }}
+                  rawText={reviewInfo?.rawText}
+                  showDebug={false}
+                  style={{minHeight:400}}
+                />
+              </div>
 
               {/* RIGHT — transaction form */}
               <div style={{flex:1,overflow:'auto',padding:'16px 20px'}}>

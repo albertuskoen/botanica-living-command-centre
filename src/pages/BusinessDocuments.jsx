@@ -15,6 +15,7 @@ import {
   SUPABASE_CONFIGURED, isOnline,
   uploadDocument, deleteDocumentCloud, getDocumentUrl, linkDocumentToTransaction,
 } from '../lib/supabase.js'
+import DocPreview from '../components/DocPreview.jsx'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = ['CIPC','SARS','Banking','Suppliers','Imports','Finance','Quotes','Invoices','General']
@@ -209,36 +210,19 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
 
   // ── Preview ────────────────────────────────────────────────────────────────
   const openPreview = useCallback(async doc => {
-    if (prevUrlRef.current) { URL.revokeObjectURL(prevUrlRef.current); prevUrlRef.current = null }
-    setPreviewDoc(doc); setPreviewUrl(null); setPreviewText(null)
-    setPreviewErr(''); setPreviewSrc(''); setPreviewLoading(true)
-
+    // DocPreview component handles URL resolution internally.
+    // For CSV/TSV we pre-parse text here so it can be passed as csvText prop.
     const ext = (doc.fileType || '').toLowerCase()
-
-    try {
-      // Build the doc descriptor for getDocumentUrl
-      const sbDoc = {
-        id:           doc.supabaseId || doc.id,
-        _idb_key:     doc.supabaseId || doc.id,
-        storage_path: doc.storagePath,
-        public_url:   doc.publicUrl,
-      }
-
-      if (ext === 'csv' || ext === 'tsv') {
-        // Try IDB first
+    let csvText = null
+    if (ext === 'csv' || ext === 'tsv') {
+      try {
         const f = await retrieveFile(doc.supabaseId || doc.id).catch(()=>null) ||
                   await retrieveFile(doc.id).catch(()=>null)
-        if (f) { setPreviewText(await f.text()); setPreviewSrc('indexeddb') }
-        else throw new Error('File not available locally. Download to view.')
-      } else {
-        const { url, source, revoke } = await getDocumentUrl(sbDoc)
-        if (revoke) prevUrlRef.current = url
-        setPreviewUrl(url); setPreviewSrc(source)
-      }
-    } catch (err) {
-      setPreviewErr(err.message)
+        if (f) csvText = await f.text()
+      } catch {}
     }
-    setPreviewLoading(false)
+    setPreviewText(csvText)
+    setPreviewDoc(doc)
   }, [])
 
   const closePreview = useCallback(() => {
@@ -612,39 +596,19 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
             </div>
 
             <div style={{flex:1,overflow:'auto',padding:16,minHeight:0}}>
-              {previewLoading && <div className="empty-st"><div style={{fontSize:28}}>⏳</div><div>Loading preview…</div></div>}
-
-              {previewErr && (
-                <div style={{textAlign:'center',padding:'32px 16px'}}>
-                  <div style={{fontSize:32,marginBottom:10}}>⚠</div>
-                  <div style={{color:T.danger,fontSize:13,marginBottom:16}}>{previewErr}</div>
-                  <button className="btn btn-primary btn-sm" onClick={()=>downloadDoc(previewDoc)}>⬇ Download to Open</button>
-                </div>
-              )}
-
-              {!previewLoading && !previewErr && previewUrl && IMG_EXT.has(previewDoc.fileType||'') && (
-                <div style={{textAlign:'center'}}>
-                  <img src={previewUrl} alt={previewDoc.name} style={{maxWidth:'100%',maxHeight:'76vh',borderRadius:8,boxShadow:'0 4px 20px rgba(0,0,0,0.15)',objectFit:'contain'}}/>
-                </div>
-              )}
-
-              {!previewLoading && !previewErr && previewUrl && (previewDoc.fileType==='pdf'||previewDoc.fileName?.toLowerCase().endsWith('.pdf')) && (
-                <iframe src={previewUrl} title={previewDoc.name} style={{width:'100%',height:'76vh',border:'none',borderRadius:8}}/>
-              )}
-
-              {!previewLoading && !previewErr && previewText && <CSVPreview text={previewText}/>}
-
-              {!previewLoading && !previewErr && !previewUrl && !previewText && (previewDoc.hasFile||previewDoc.storageBackend==='supabase') &&
-               !IMG_EXT.has(previewDoc.fileType||'') && previewDoc.fileType!=='pdf' && !previewDoc.fileName?.toLowerCase().endsWith('.pdf') && (
-                <div style={{textAlign:'center',padding:'44px 24px'}}>
-                  <div style={{fontSize:44,marginBottom:14}}>📎</div>
-                  <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:T.forest,marginBottom:8}}>{previewDoc.fileName||previewDoc.name}</div>
-                  <div style={{fontSize:13,color:T.textMid,marginBottom:20}}>
-                    Preview not available for <strong>.{previewDoc.fileType}</strong> files. Download to open.
-                  </div>
-                  <button className="btn btn-primary" onClick={()=>downloadDoc(previewDoc)}>⬇ Download to Open</button>
-                </div>
-              )}
+              <DocPreview
+                doc={{
+                  id:           previewDoc.supabaseId || previewDoc.id,
+                  supabaseId:   previewDoc.supabaseId || previewDoc.id,
+                  storage_path: previewDoc.storagePath,
+                  public_url:   previewDoc.publicUrl,
+                  file_name:    previewDoc.fileName || previewDoc.name,
+                  file_type:    previewDoc.fileType,
+                  csvText:      previewText || null,
+                }}
+                onDownload={() => downloadDoc(previewDoc)}
+                showDebug={false}
+              />
             </div>
           </div>
         </div>

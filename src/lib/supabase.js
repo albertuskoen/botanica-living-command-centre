@@ -161,8 +161,37 @@ export async function uploadDocument(file, meta = {}) {
 // ── DOCUMENT URL (preview / download) ────────────────────────────────────────
 // Returns { url: string, source: 'indexeddb'|'public'|'signed', revoke: bool }
 export async function getDocumentUrl(doc, expiresIn = 3600) {
-  // 1. Try IndexedDB cache (offline, fast)
-  const idbKey = doc.id || doc._idb_key || doc._local && doc.id
+  // ── PRIORITY 1: Fresh Supabase signed URL ────────────────────────────────────
+  // Always preferred over stored public_url because:
+  //   - Signed URLs are generated fresh each time (no stale/encoded URL issues)
+  //   - Works for both public AND private buckets
+  //   - Avoids "Bucket not found" errors caused by URL-encoded bucket names in stored public_url
+  //   - Works on every device, not just the one that uploaded
+  if (SUPABASE_CONFIGURED && doc.storage_path) {
+    try {
+      const client = await getClient()
+      const { data, error } = await client.storage
+        .from(BUCKET)
+        .createSignedUrl(doc.storage_path, expiresIn)
+      if (!error && data?.signedUrl) {
+        return { url: data.signedUrl, source: 'signed', revoke: false }
+      }
+      // If signed URL fails, log and fall through
+      if (error) console.warn('[Supabase] createSignedUrl failed:', error.message, '— trying public URL')
+    } catch (e) {
+      console.warn('[Supabase] createSignedUrl threw:', e.message, '— trying public URL')
+    }
+  }
+
+  // ── PRIORITY 2: Stored public URL (fallback when signed URL unavailable) ─────
+  // May fail with 404 if bucket name encoding in URL doesn't match,
+  // but kept as fallback for public buckets.
+  if (doc.public_url) {
+    return { url: doc.public_url, source: 'public', revoke: false }
+  }
+
+  // ── PRIORITY 3: IndexedDB cache (offline / same-device fallback) ─────────────
+  const idbKey = doc.id || doc._idb_key
   if (idbKey) {
     try {
       const { createObjectURL } = await import('./fileStore.js')
@@ -171,22 +200,10 @@ export async function getDocumentUrl(doc, expiresIn = 3600) {
     } catch { /* fall through */ }
   }
 
-  if (!SUPABASE_CONFIGURED) throw new Error('File not in local cache and Supabase not configured.')
-
-  const client = await getClient()
-
-  // 2. Public bucket → direct URL (no expiry)
-  if (doc.public_url) {
-    return { url: doc.public_url, source: 'public', revoke: false }
+  if (!SUPABASE_CONFIGURED) {
+    throw new Error('Supabase not configured — document only available on the device it was uploaded from.')
   }
-
-  // 3. Private bucket → signed URL (1 hour)
-  if (!doc.storage_path) throw new Error('Document has no storage path.')
-  const { data, error } = await client.storage
-    .from(BUCKET)
-    .createSignedUrl(doc.storage_path, expiresIn)
-  if (error) throw new Error(`Signed URL: ${error.message}`)
-  return { url: data.signedUrl, source: 'signed', revoke: false }
+  throw new Error('Document not available — signed URL failed and no local copy found.')
 }
 
 // ── DOCUMENT DELETE ───────────────────────────────────────────────────────────
