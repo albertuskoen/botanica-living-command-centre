@@ -75,3 +75,5 @@ export const safeAmount = n => {
 // ── String safety ──────────────────────────────────────────────────────────────
 export const safeStr   = (v, fallback = '') => (typeof v === 'string' ? v : String(v ?? fallback))
 export const truncate  = (s, n = 80) => { const str = safeStr(s); return str.length > n ? str.slice(0, n) + '…' : str }
+
+export const formatBytes = n => { if(!n||n===0)return'0 B'; const k=1024,i=Math.floor(Math.log(n)/Math.log(k)); return `${+(n/k**i).toFixed(1)} ${['B','KB','MB','GB'][i]||'GB'}` }
