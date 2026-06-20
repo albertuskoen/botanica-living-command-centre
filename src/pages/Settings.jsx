@@ -61,6 +61,102 @@ function InfoRow({ label, value, mono }) {
   )
 }
 
+// ── PWA Install section (smart — captures beforeinstallprompt) ────────────────
+function PWAInstallSection() {
+  const [canInstall,   setCanInstall]   = useState(!!window.__pwaInstallPrompt)
+  const [installed,    setInstalled]    = useState(
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  )
+  const [installing,   setInstalling]   = useState(false)
+
+  useEffect(() => {
+    const onInstallable = () => setCanInstall(true)
+    const onInstalled   = () => { setInstalled(true); setCanInstall(false) }
+    window.addEventListener('pwa-installable', onInstallable)
+    window.addEventListener('pwa-installed',   onInstalled)
+    return () => {
+      window.removeEventListener('pwa-installable', onInstallable)
+      window.removeEventListener('pwa-installed',   onInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    const prompt = window.__pwaInstallPrompt
+    if (!prompt) return
+    setInstalling(true)
+    prompt.prompt()
+    const { outcome } = await prompt.userChoice
+    if (outcome === 'accepted') {
+      window.__pwaInstallPrompt = null
+      setCanInstall(false)
+      setInstalled(true)
+    }
+    setInstalling(false)
+  }
+
+  return (
+    <div className="settings-section">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+        <div className="settings-title" style={{ margin:0 }}>📱 Install App</div>
+        {installed
+          ? <span style={{ color:T.green, fontWeight:700, fontSize:12 }}>✅ Installed (standalone)</span>
+          : <span style={{ fontSize:12, color:T.textLight }}>Not installed</span>
+        }
+      </div>
+
+      {installed ? (
+        <div style={{ fontSize:13, color:T.textMid, lineHeight:1.7 }}>
+          The app is already installed and running in standalone mode.
+          You can access it directly from your home screen.
+        </div>
+      ) : canInstall ? (
+        <>
+          <div style={{ fontSize:13, color:T.textMid, lineHeight:1.7, marginBottom:14 }}>
+            Your browser supports one-tap install. Tap the button below to add Botanica Living to your home screen.
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleInstall}
+            disabled={installing}
+            style={{ minWidth:220 }}
+          >
+            {installing ? 'Installing…' : '⬇ Install App on This Device'}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize:13, color:T.textMid, lineHeight:1.7, marginBottom:16 }}>
+            Install as a PWA for a full-screen native app experience — no App Store needed.
+            The install button appears automatically when the browser detects the app can be installed.
+          </div>
+          <div style={{ marginBottom:12, padding:'10px 14px', background:'rgba(184,151,90,0.08)', border:`1px solid rgba(184,151,90,0.2)`, borderRadius:10, fontSize:12, color:T.textMid }}>
+            If the install button has not appeared: open the app in Chrome or Samsung Internet, use it for a few seconds, then check again.
+          </div>
+          <div style={{ fontSize:12, fontWeight:600, color:T.forest, marginBottom:8 }}>
+            Manual install — Chrome on Android / Samsung Internet:
+          </div>
+          {['Open this page in Chrome or Samsung Internet (not in-app browser).',
+            'Tap the browser menu — the three dots ⋮ in the top-right corner.',
+            "Select 'Add to Home Screen' or 'Install App'.",
+            "Tap 'Add' or 'Install' to confirm.",
+            'The app icon appears on your home screen and opens full-screen.'
+          ].map((s, i) => (
+            <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, fontSize:13, color:T.textMid }}>
+              <span style={{ color:T.gold, fontWeight:700, flexShrink:0 }}>{i+1}.</span>
+              <span>{s}</span>
+            </div>
+          ))}
+          <div style={{ marginTop:12, fontSize:11, color:T.textLight, lineHeight:1.6 }}>
+            <strong>Samsung Internet note:</strong> Go to ☰ → Add page to → Home screen.
+            Ensure the app is accessed via HTTPS (Vercel deployment) not localhost.
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Settings({ allData, onRestore, onLogout }) {
   const [restoreStatus,  setRestoreStatus]  = useState(null)
   const [backupDone,     setBackupDone]     = useState(false)
@@ -385,18 +481,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
         </div>
 
         {/* ── PWA Install ─────────────────────────────────────────────── */}
-        <div className="settings-section">
-          <div className="settings-title">📱 Install on Samsung / Android</div>
-          <div style={{ fontSize:13, color:T.textMid, lineHeight:1.8, marginBottom:14 }}>
-            Progressive Web App — install for a native app experience without the App Store.
-          </div>
-          {['Open in Chrome or Samsung Internet.','Tap the browser menu (⋮ three dots).',"Select 'Add to Home Screen' or 'Install App'.",'Confirm. App icon appears on home screen.','Opens full-screen, no browser bar.'].map((s,i) => (
-            <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.35)`, fontSize:13, color:T.textMid }}>
-              <span style={{ color:T.gold, fontWeight:700, flexShrink:0 }}>{i+1}.</span>
-              <span>{s}</span>
-            </div>
-          ))}
-        </div>
+        <PWAInstallSection />
 
         <LayoutHealth/>
 

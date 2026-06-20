@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { T } from '../utils/tokens.js'
 import {
   hasPIN, setPIN, verifyPIN,
-  getTOTPConfig, saveTOTPConfig, generateTOTPSecret, getTOTPQRUrl, getTOTPUri, verifyTOTP,
+  getTOTPConfig, saveTOTPConfig, generateTOTPSecret, getTOTPQRUrl, getTOTPQRUrlFallback, getTOTPUri, verifyTOTP,
   isDeviceTrusted, trustDevice,
   createSession, saveAuthConfig,
 } from '../lib/auth.js'
@@ -77,7 +77,7 @@ export default function LoginScreen({ onAuthenticated }) {
   const [error,         setError]         = useState('')
   const [working,       setWorking]       = useState(false)
   const [remember,      setRemember]      = useState(false)
-  const [qrFailed,      setQrFailed]      = useState(false)
+  const [qrFailed,      setQrFailed]      = useState(0)    // 0=ok, 1=primary failed, 2=all failed
 
   const pinRef     = useRef(null)
   const confirmRef = useRef(null)
@@ -126,7 +126,7 @@ export default function LoginScreen({ onAuthenticated }) {
       const secret = generateTOTPSecret()
       setTotpSecret(secret)
       setTotpCode('')
-      setQrFailed(false)
+      setQrFailed(0)
       setStep('setup_totp')
     } catch (e) { setError(e.message) }
     setWorking(false)
@@ -244,55 +244,107 @@ export default function LoginScreen({ onAuthenticated }) {
   )
 
   // ── SETUP: 2FA (optional) ─────────────────────────────────────────────────
+  // ── SETUP: 2FA (optional) ─────────────────────────────────────────────────
   if (step === 'setup_totp') {
-    const qrUrl     = getTOTPQRUrl(totpSecret, 'BotanicaLiving')
     const manualUri = getTOTPUri(totpSecret, 'BotanicaLiving')
+    // Try primary QR service; fallback and retry cycle through alternatives
+    const QR_SOURCES = [
+      getTOTPQRUrl(totpSecret, 'BotanicaLiving'),
+      getTOTPQRUrlFallback(totpSecret, 'BotanicaLiving'),
+    ]
+    const qrSrc = qrFailed === 1 ? QR_SOURCES[1] : QR_SOURCES[0]
+    const showImg = qrFailed < 2   // hide image entirely only after both sources fail
 
     return (
       <Wrap>
-        <H title="Set Up 2FA (Optional)" sub="Scan the QR code with Google Authenticator, Authy, or any TOTP app. You can skip this and add 2FA later in Settings." />
+        <H
+          title="Set Up 2FA (Optional)"
+          sub="Scan the QR code with Google Authenticator or Authy. 2FA is optional — tap Skip to enter the app now."
+        />
 
-        {/* QR code */}
-        <div style={{ textAlign:'center', marginBottom:16 }}>
-          {!qrFailed ? (
-            <img
-              src={qrUrl}
-              alt="2FA QR code"
-              style={{ width:180, height:180, borderRadius:10, background:'#fff', padding:6, display:'block', margin:'0 auto 10px' }}
-              onError={() => setQrFailed(true)}
-            />
+        {/* QR image with fallback chain */}
+        <div style={{ textAlign:'center', marginBottom:14 }}>
+          {showImg ? (
+            <>
+              <img
+                key={qrSrc}
+                src={qrSrc}
+                alt="Scan this QR code in Google Authenticator"
+                style={{ width:190, height:190, borderRadius:10, background:'#fff', padding:6, display:'block', margin:'0 auto 8px' }}
+                onError={() => setQrFailed(prev => (prev || 0) + 1)}
+              />
+              <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
+                <button
+                  style={{ ...S.ghost, fontSize:11 }}
+                  onClick={() => setQrFailed(0)}
+                >
+                  ↺ Retry QR image
+                </button>
+                <button
+                  style={{ ...S.ghost, fontSize:11 }}
+                  onClick={() => {
+                    const s = generateTOTPSecret()
+                    setTotpSecret(s)
+                    setTotpCode('')
+                    setQrFailed(0)
+                    setError('')
+                  }}
+                >
+                  ⟳ Generate new QR / key
+                </button>
+              </div>
+            </>
           ) : (
-            <div style={{ padding:'16px 12px', background:'rgba(185,28,28,0.12)', border:'1px solid rgba(185,28,28,0.25)', borderRadius:10, marginBottom:10, fontSize:12, color:'#F87171' }}>
-              QR image failed to load. Use the manual key below.
+            <div style={{ padding:'12px 14px', background:'rgba(185,28,28,0.1)', border:'1px solid rgba(185,28,28,0.25)', borderRadius:10, marginBottom:8, fontSize:12, color:'#F87171' }}>
+              QR image could not load from any source.
+              Use the manual setup key below — it works the same way.
+              <div style={{ marginTop:8 }}>
+                <button
+                  style={{ ...S.ghost, fontSize:11, color:'#F87171' }}
+                  onClick={() => {
+                    const s = generateTOTPSecret()
+                    setTotpSecret(s)
+                    setTotpCode('')
+                    setQrFailed(0)
+                    setError('')
+                  }}
+                >
+                  ⟳ Generate new key and retry
+                </button>
+              </div>
             </div>
           )}
-          <div style={{ fontSize:11, color:'rgba(232,192,122,0.5)', marginBottom:6 }}>
-            Can't scan? Add manually in your authenticator app:
-          </div>
         </div>
 
-        {/* Manual setup key */}
-        <div style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(232,192,122,0.2)', borderRadius:8, padding:'10px 12px', marginBottom:12 }}>
-          <div style={{ fontSize:10, color:'rgba(232,192,122,0.5)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:6 }}>Manual setup key</div>
+        {/* Manual setup key — always visible, not hidden in details */}
+        <div style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(232,192,122,0.2)', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+          <div style={{ fontSize:10, color:'rgba(232,192,122,0.55)', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:8 }}>
+            Manual setup key — use this if QR scan fails
+          </div>
+          <div style={{ fontSize:11, color:'rgba(232,192,122,0.6)', marginBottom:8, lineHeight:1.5 }}>
+            In Google Authenticator: tap <strong style={{color:'#E8C07A'}}>+</strong> → <strong style={{color:'#E8C07A'}}>Enter a setup key</strong> → Account: <em>BotanicaLiving</em> → Key: paste below → Type: Time-based
+          </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <code style={{ fontSize:13, color:'#E8C07A', letterSpacing:'0.1em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.6 }}>
+            <code style={{ fontSize:14, color:'#E8C07A', letterSpacing:'0.15em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.8 }}>
               {totpSecret.match(/.{1,4}/g)?.join(' ')}
             </code>
-            <CopyBtn text={totpSecret} label="Copy key" />
+            <CopyBtn text={totpSecret} label="Copy" />
           </div>
         </div>
 
-        {/* Full URI (for advanced users / import) */}
+        {/* Full URI — collapsed but copyable */}
         <details style={{ marginBottom:12 }}>
-          <summary style={{ fontSize:11, color:'rgba(232,192,122,0.4)', cursor:'pointer', userSelect:'none' }}>Show full otpauth:// URI</summary>
+          <summary style={{ fontSize:11, color:'rgba(232,192,122,0.4)', cursor:'pointer', userSelect:'none' }}>
+            Show full otpauth:// URI (for other apps)
+          </summary>
           <div style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:6 }}>
-            <code style={{ fontSize:10, color:'rgba(232,192,122,0.5)', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.6 }}>{manualUri}</code>
+            <code style={{ fontSize:10, color:'rgba(232,192,122,0.45)', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.65 }}>{manualUri}</code>
             <CopyBtn text={manualUri} label="Copy" />
           </div>
         </details>
 
-        {/* Verification code entry */}
-        <label style={S.label}>Enter 6-digit code to verify setup</label>
+        {/* Code verification */}
+        <label style={S.label}>Enter 6-digit code from your authenticator app</label>
         <input
           ref={totpRef}
           type="text"
@@ -301,15 +353,21 @@ export default function LoginScreen({ onAuthenticated }) {
           value={totpCode}
           maxLength={7}
           autoComplete="one-time-code"
-          onChange={e => { setTotpCode(e.target.value.replace(/\D/g,'')); clear() }}
+          onChange={e => { setTotpCode(e.target.value.replace(/\D/g, '')); clear() }}
           onKeyDown={e => e.key === 'Enter' && handleVerifyTOTPSetup()}
-          style={{ ...S.input, textAlign:'center', letterSpacing:'0.3em', fontSize:20 }}
+          style={{ ...S.input, textAlign:'center', letterSpacing:'0.3em', fontSize:22 }}
         />
 
         {/* Trusted device */}
         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
-          <input type="checkbox" id="trust-s" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
-          <label htmlFor="trust-s" style={{ color:'rgba(232,192,122,0.65)', fontSize:12, cursor:'pointer' }}>Trust this device (skip 2FA here)</label>
+          <input
+            type="checkbox" id="trust-s" checked={remember}
+            onChange={e => setRemember(e.target.checked)}
+            style={{ accentColor:'#B8975A', width:15, height:15 }}
+          />
+          <label htmlFor="trust-s" style={{ color:'rgba(232,192,122,0.65)', fontSize:12, cursor:'pointer' }}>
+            Trust this device (skip 2FA on next login here)
+          </label>
         </div>
 
         {error && <div style={S.err}>⚠ {error}</div>}
@@ -317,18 +375,21 @@ export default function LoginScreen({ onAuthenticated }) {
         <button
           style={S.btn}
           onClick={handleVerifyTOTPSetup}
-          disabled={working || totpCode.replace(/\D/g,'').length !== 6}
+          disabled={working || totpCode.replace(/\D/g, '').length !== 6}
         >
           {working ? 'Verifying…' : 'Verify & Enable 2FA'}
         </button>
 
-        {/* Always-visible skip */}
-        <button style={{ ...S.btn, background:'rgba(232,192,122,0.1)', color:'#E8C07A', border:'1px solid rgba(232,192,122,0.25)', marginTop:8 }} onClick={skip2FA}>
+        {/* Skip — always prominent */}
+        <button
+          style={{ ...S.btn, background:'transparent', color:'#E8C07A', border:'1px solid rgba(232,192,122,0.3)', marginTop:8 }}
+          onClick={skip2FA}
+        >
           Skip 2FA — Enter App Now
         </button>
 
-        <div style={{ marginTop:10, fontSize:11, color:'rgba(232,192,122,0.4)', textAlign:'center', lineHeight:1.5 }}>
-          You can enable 2FA later from Settings → Security.
+        <div style={{ marginTop:10, fontSize:11, color:'rgba(232,192,122,0.38)', textAlign:'center', lineHeight:1.5 }}>
+          You can enable 2FA at any time from Settings → Security.
         </div>
       </Wrap>
     )

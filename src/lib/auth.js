@@ -123,10 +123,15 @@ export function generateTOTPSecret() {
 
 export function getTOTPQRUrl(secret, label = 'BotanicaLiving') {
   const issuer = 'BotanicaLiving'
-  // Build the URI — Google Authenticator requires this exact format
-  const uri = `otpauth://totp/${encodeURIComponent(issuer + ':' + label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`
-  // Use chart.googleapis.com as the QR generator — widely accessible, reliable
+  const uri = getTOTPUri(secret, label)
+  // Primary: Google Charts (widely reachable, no CORS issues for img tag)
   return `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(uri)}`
+}
+
+// Fallback QR URL using a different service
+export function getTOTPQRUrlFallback(secret, label = 'BotanicaLiving') {
+  const uri = getTOTPUri(secret, label)
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(uri)}`
 }
 
 // Also export the raw otpauth URI so LoginScreen can display/copy it directly
