@@ -503,7 +503,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
         )}
       </div>
 
-      {/* ══ ADD / EDIT MODAL ════════════════════════════════════════════════ */}
+      {/* ADD / EDIT MODAL */}
       <Modal open={modal} onClose={()=>setModal(false)} title={editing!=null?'Edit Document':'Add Document'}
         footer={<>
           <button className="btn btn-outline" onClick={()=>setModal(false)} disabled={uploading}>Cancel</button>
@@ -575,7 +575,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
         </div>
       </Modal>
 
-      {/* ══ PREVIEW MODAL ════════════════════════════════════════════════════ */}
+      {/* PREVIEW MODAL */}
       {previewDoc && (
         <div className="modal-overlay" onClick={closePreview}>
           <div

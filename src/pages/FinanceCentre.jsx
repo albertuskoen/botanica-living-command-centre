@@ -1027,12 +1027,8 @@ export default function FinanceCentre({ finance, setFinance }) {
           </div>
         </div>
       )}
-    </div>
 
-      {/* ══ SOURCE DOCUMENT PREVIEW MODAL ════════════════════════════════════════
-          Reuses identical DocPreview component as Business Documents.
-          Opens when "👁 Doc" is clicked on a transaction row.
-      ══════════════════════════════════════════════════════════════════════════ */}
+      {/* Source document preview modal — opens when Doc button clicked on transaction row */}
       {docPreviewTxn && (
         <div className="modal-overlay" onClick={()=>setDocPreviewTxn(null)}>
           <div
