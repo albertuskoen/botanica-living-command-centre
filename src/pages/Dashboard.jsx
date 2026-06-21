@@ -115,7 +115,7 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
       <div className="page-header">
         <div>
           <div className="page-title">Dashboard</div>
-          <div className="page-subtitle">Botanica Living · Premium Artificial Greenery</div>
+          <div className="page-subtitle">Botanica Living · Business Platform</div>
         </div>
         <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontStyle:'italic', color:T.gold, opacity:0.85 }}>
           Designed for Life. Inspired by Nature.
@@ -317,7 +317,7 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
               { green:false, title:'Open business bank account',            desc:'Unblocks supplier payments. Waiting on name change documents.' },
               { green:false, title:'Complete importer registration',         desc:'SARS eFiling — required before first shipment can clear customs.' },
               { green:false, title:'Order Founders Collection samples',      desc:'Confirm with Frank / Dongyi. 6 hero SKUs selected and ready.' },
-              { green:true,  title:'Build Checkers Hyper pitch deck',        desc:'Financial model + shop-in-shop visual concept + pilot proposal.' },
+              { green:true,  title:'Build Strategy pitch deck',        desc:'Financial model + shop-in-shop visual concept + pilot proposal.' },
               { green:true,  title:'Finalise import calculator assumptions',  desc:'Align duty % and exchange rate with clearing agent.' },
             ].map((p, i) => (
               <div className="priority-item" key={i}>

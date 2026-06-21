@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import css from './utils/css.js'
 import useLocalStorage from './hooks/useLocalStorage.js'
 import { flushSyncQueue, SUPABASE_CONFIGURED, loadDocumentsFromCloud, loadTransactionsFromCloud } from './lib/supabase.js'
-import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS } from './utils/data.js'
+import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS, INIT_CLIENTS } from './utils/data.js'
 import {
   isSessionValid, touchSession, clearSession, isIdleExpired, getAuthConfig,
 } from './lib/auth.js'
@@ -17,7 +17,9 @@ import BusinessDocuments from './pages/BusinessDocuments.jsx'
 import Suppliers         from './pages/Suppliers.jsx'
 import Products          from './pages/Products.jsx'
 import Settings          from './pages/Settings.jsx'
-import { Calculator, CheckersHyper, FoundersCollection, Strategy } from './pages/OtherPages.jsx'
+import { FoundersCollection, Strategy } from './pages/OtherPages.jsx'
+import SupplierZone from './pages/SupplierZone.jsx'
+import ClientDatabase from './pages/ClientDatabase.jsx'
 
 // ── Global error boundary ─────────────────────────────────────────────────────
 import { Component } from 'react'
@@ -116,6 +118,7 @@ export default function App() {
   const [finance,    setFinance]    = useLocalStorage('bl_finance',   INIT_FINANCE)
   const [tasks,      setTasks]      = useLocalStorage('bl_tasks',     INIT_TASKS)
   const [documents,  setDocuments]  = useLocalStorage('bl_documents', INIT_DOCUMENTS)
+  const [clients,    setClients]    = useLocalStorage('bl_clients', INIT_CLIENTS)
 
   // ── Load from Supabase on mount (only when authenticated) ───────────────────
   useEffect(() => {
@@ -178,7 +181,8 @@ export default function App() {
   const safeTasks     = ensureArray(tasks)
   const safeDocuments = ensureArray(documents)
 
-  const allData = { suppliers:safeSuppliers, products:safeProducts, progress:safeProgress, finance:safeFinance, tasks:safeTasks, documents:safeDocuments }
+  const safeClients   = ensureArray(clients)
+  const allData = { suppliers:safeSuppliers, products:safeProducts, progress:safeProgress, finance:safeFinance, tasks:safeTasks, documents:safeDocuments, clients:safeClients }
 
   const onRestore = useCallback(d => {
     try {
@@ -189,6 +193,7 @@ export default function App() {
       if (Array.isArray(d.finance)    && d.finance.length    >= 0) setFinance(d.finance)
       if (Array.isArray(d.tasks)      && d.tasks.length      >= 0) setTasks(d.tasks)
       if (Array.isArray(d.documents)  && d.documents.length  >= 0) setDocuments(d.documents)
+      if (Array.isArray(d.clients)    && d.clients.length    >= 0) setClients(d.clients)
     } catch (err) { console.error('[Botanica] Restore failed:', err); alert('Restore failed: ' + err.message) }
   }, [setSuppliers, setProducts, setProgress, setFinance, setTasks, setDocuments])
 
@@ -216,12 +221,11 @@ export default function App() {
             {page === 'finance'    && <FinanceCentre      finance={safeFinance}     setFinance={setFinance} />}
             {page === 'actions'    && <ActionCentre       tasks={safeTasks}         setTasks={setTasks} />}
             {page === 'documents'  && <BusinessDocuments  documents={safeDocuments} setDocuments={setDocuments} finance={safeFinance} />}
-            {page === 'suppliers'  && <Suppliers          suppliers={safeSuppliers} setSuppliers={setSuppliers} />}
-            {page === 'products'   && <Products           products={safeProducts}   setProducts={setProducts} suppliers={safeSuppliers} />}
-            {page === 'calculator' && <Calculator />}
-            {page === 'checkers'   && <CheckersHyper />}
-            {page === 'founders'   && <FoundersCollection products={safeProducts} />}
-            {page === 'strategy'   && <Strategy />}
+            {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} />}
+            {page === 'products'     && <Products products={safeProducts} setProducts={setProducts} suppliers={safeSuppliers} />}
+            {page === 'clients'      && <ClientDatabase clients={safeClients} setClients={setClients} />}
+            {page === 'founders'     && <FoundersCollection products={safeProducts} />}
+            {page === 'strategy'     && <Strategy />}
             {page === 'settings'   && <Settings           allData={allData}         onRestore={onRestore} onLogout={handleLogout} />}
           </PageBoundary>
         </main>

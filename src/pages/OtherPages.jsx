@@ -412,36 +412,95 @@ const PILLARS = [
   { title:'We sell transformed spaces — not just plants.', body:"Customers buy the feeling of a lush, effortless interior. Sell the outcome, not the object." },
 ]
 export function Strategy() {
+  const [tab, setTab] = useState('pillars')
   return (
     <div>
-      <div className="page-header"><div><div className="page-title">Strategy & Blueprint</div><div className="page-subtitle">Brand Principles & Commercial Direction</div></div></div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Strategy</div>
+          <div className="page-subtitle">Long Term Opportunities · Brand Pillars · Growth Planning</div>
+        </div>
+      </div>
       <div className="page-content">
-        <div className="quote-block"><div className="quote-text">"Sell first. Scale second."</div><div className="quote-attr">Botanica Living Group — Founding Principle</div></div>
-        <div className="sec-label">Brand Pillars</div>
-        {PILLARS.map((p,i) => (
-          <div className="strategy-pillar" key={i}>
-            <div className="sp-title">{p.title}</div>
-            <div className="sp-body">{p.body}</div>
-          </div>
-        ))}
-        <div className="divider" />
-        <div className="grid-3">
-          {[
-            { icon:'◎', title:'Channels',        items:['Checkers Hyper (retail)','Commercial projects','Designers & architects','Hospitality','Direct consumer'] },
-            { icon:'◈', title:'Operations',       items:['Import via FOB/CIF','Local assembly & QC','Pot & finishing in-house','Direct fulfillment','Container optimisation'] },
-            { icon:'✦', title:'Competitive Moat', items:['Premium curation','Local assembly quality','Brand storytelling','Supplier relationships','Designer community'] },
-          ].map(col => (
-            <div className="g-card" key={col.title}>
-              <div style={{ fontSize:18, marginBottom:8, color:T.gold }}>{col.icon}</div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:17, color:T.forest, marginBottom:12 }}>{col.title}</div>
-              {col.items.map(item => (
-                <div key={item} style={{ display:'flex', gap:8, padding:'6px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, fontSize:13, color:T.textMid }}>
-                  <span style={{ color:T.gold }}>—</span>{item}
-                </div>
-              ))}
-            </div>
+        <div className="tabs">
+          {[{id:'pillars',label:'Brand Pillars'},{id:'opportunities',label:'Long Term Opportunities'},{id:'channels',label:'Channels & Operations'}].map(t=>(
+            <div key={t.id} className={`tab ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>{t.label}</div>
           ))}
         </div>
+
+        {tab==='pillars' && (
+          <>
+            <div className="quote-block"><div className="quote-text">Designed for Life. Inspired by Nature.</div><div className="quote-attr">Botanica Living — Brand Tagline</div></div>
+            <div className="sec-label">Brand Pillars</div>
+            {PILLARS.map((p,i) => (
+              <div className="strategy-pillar" key={i}>
+                <div className="sp-title">{p.title}</div>
+                <div className="sp-body">{p.body}</div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {tab==='opportunities' && (
+          <div>
+            <div className="sec-label">Long Term Opportunities</div>
+            {[
+              { icon:'⊟', title:'Checkers Hyper — Shop-in-Shop', priority:'Critical',
+                body:'Anchor retail opportunity. Premium artificial greenery branded shop-in-shop concept for Checkers Hyper stores nationally. Requires: pitch deck, pilot proposal, buyer contact in Non-Foods/Home category at Shoprite Holdings.',
+                actions:['Build pitch deck','Model pilot financials','Identify category buyer contact','Submit pilot proposal'] },
+              { icon:'◉', title:'Healthcare Network Rollout', priority:'High',
+                body:'Mediclinic, Netcare and Life Healthcare represent recurring high-volume opportunities for reception, corridor and waiting area greenery. Low maintenance requirement is a key advantage over live plants.',
+                actions:['Create healthcare-specific product selection','Identify facilities management contacts','Build B2B pricing structure'] },
+              { icon:'✦', title:'Property Sector Partnerships', priority:'High',
+                body:'Growthpoint, Redefine and Attacq manage large office and retail portfolios. Facilities management departments control interior greening budgets. Annual or biennial replacement cycles create recurring revenue.',
+                actions:['Contact facilities management at Growthpoint','Build commercial project case study','Create volume pricing proposal'] },
+              { icon:'◈', title:'Designer & Architect Community', priority:'Medium',
+                body:'Interior designers and architects specify products for commercial and residential projects. Trade programme with trade pricing, sample room access and co-branding opportunities.',
+                actions:['Launch trade programme','Create trade lookbook','Establish designer pricing tier'] },
+            ].map(opp => (
+              <div key={opp.title} className="g-card" style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10,flexWrap:'wrap',gap:8}}>
+                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                    <span style={{fontSize:20,color:T.gold}}>{opp.icon}</span>
+                    <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:T.forest}}>{opp.title}</div>
+                  </div>
+                  <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,
+                    background:opp.priority==='Critical'?T.redPale:opp.priority==='High'?T.goldPale:'rgba(161,161,170,0.1)',
+                    color:opp.priority==='Critical'?T.danger:opp.priority==='High'?T.gold:T.textMid}}>
+                    {opp.priority}
+                  </span>
+                </div>
+                <div style={{fontSize:13,color:T.textMid,lineHeight:1.7,marginBottom:12}}>{opp.body}</div>
+                <div className="sec-label" style={{fontSize:9,marginBottom:6}}>Actions required</div>
+                {opp.actions.map(a=>(
+                  <div key={a} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid rgba(210,200,184,0.25)`,fontSize:12,color:T.textMid}}>
+                    <span style={{color:T.gold,flexShrink:0}}>→</span>{a}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab==='channels' && (
+          <div className="grid-3">
+            {[
+              { icon:'◎', title:'Sales Channels',   items:['Checkers Hyper (anchor retail)','Commercial projects','Designers & architects','Hospitality','Healthcare & education','Direct consumer'] },
+              { icon:'◈', title:'Operations',        items:['Import via FOB/CIF','Local assembly & QC (Paarl)','Pot & finishing in-house','Direct fulfillment','Container optimisation'] },
+              { icon:'✦', title:'Competitive Moat',  items:['Premium curation & brand','Local assembly quality','Botanica Living story','Supplier relationships','Designer community access'] },
+            ].map(col => (
+              <div className="g-card" key={col.title}>
+                <div style={{fontSize:18,marginBottom:8,color:T.gold}}>{col.icon}</div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:T.forest,marginBottom:12}}>{col.title}</div>
+                {col.items.map(item => (
+                  <div key={item} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:`1px solid rgba(210,200,184,0.3)`,fontSize:13,color:T.textMid}}>
+                    <span style={{color:T.gold}}>—</span>{item}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

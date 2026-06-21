@@ -31,7 +31,7 @@ function stampRecords(records = [], deviceId) {
 }
 function buildBackup(allData, deviceId) {
   return { _meta:{ version:APP_VERSION, exportedAt:new Date().toISOString(), exportedFrom:deviceId, appName:'Botanica Living Command Centre', schemaVersion:3 },
-    data:{ suppliers:stampRecords(allData.suppliers||[],deviceId), products:stampRecords(allData.products||[],deviceId), finance:stampRecords(allData.finance||[],deviceId), tasks:stampRecords(allData.tasks||[],deviceId), documents:stampRecords(allData.documents||[],deviceId), progress:allData.progress, settings:{ deviceId, exportedAt:new Date().toISOString() } } }
+    data:{ suppliers:stampRecords(allData.suppliers||[],deviceId), products:stampRecords(allData.products||[],deviceId), finance:stampRecords(allData.finance||[],deviceId), tasks:stampRecords(allData.tasks||[],deviceId), documents:stampRecords(allData.documents||[],deviceId), clients:stampRecords(allData.clients||[],deviceId), progress:allData.progress, settings:{ deviceId, exportedAt:new Date().toISOString() } } }
 }
 function validateBackup(parsed) {
   if (!parsed||typeof parsed!=='object') return { ok:false, reason:'Not a valid JSON object.' }
@@ -445,6 +445,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
               { icon:'📄', label:'Documents', count:allData.documents?.length||0, unit:'records' },
               { icon:'📦', label:'Products',  count:allData.products?.length||0,  unit:'SKUs' },
               { icon:'◎',  label:'Suppliers', count:allData.suppliers?.length||0, unit:'suppliers' },
+              { icon:'◉',  label:'Clients',    count:allData.clients?.length||0,    unit:'organisations' },
               { icon:'▸',  label:'Progress',  count:allData.progress?.flatMap(s=>s.tasks)?.length||0, unit:'tasks' },
             ].map(r => (
               <div key={r.label} style={{ background:'rgba(228,221,208,0.4)', borderRadius:8, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>

@@ -1,20 +1,19 @@
 import { NAV } from '../utils/data.js'
 
-const GROUPS = ['Core', 'Products', 'Strategy', 'System']
+const GROUPS = ['Core', 'Supplier Zone', 'Market', 'Strategy', 'System']
 
 const PAGE_ICONS = {
-  dashboard:  { icon: '⬡', label: 'Dashboard' },
-  progress:   { icon: '◐', label: 'Business Progress' },
-  finance:    { icon: '◈', label: 'Finance Centre' },
-  actions:    { icon: '⊙', label: 'Action Centre' },
-  documents:  { icon: '▣', label: 'Documents' },
-  suppliers:  { icon: '◎', label: 'Suppliers' },
-  products:   { icon: '❧', label: 'Products' },
-  calculator: { icon: '⊞', label: 'Import Calculator' },
-  checkers:   { icon: '⊟', label: 'Checkers Hyper' },
-  founders:   { icon: '✦', label: 'Founders Collection' },
-  strategy:   { icon: '◉', label: 'Strategy' },
-  settings:   { icon: '⊛', label: 'Settings' },
+  dashboard:    { icon: '⬡', label: 'Dashboard' },
+  progress:     { icon: '◐', label: 'Business Progress' },
+  finance:      { icon: '◈', label: 'Finance Centre' },
+  actions:      { icon: '⊙', label: 'Action Centre' },
+  documents:    { icon: '▣', label: 'Business Documents' },
+  supplierzone: { icon: '◎', label: 'Supplier Zone' },
+  products:     { icon: '❧', label: 'Product Database' },
+  clients:      { icon: '◉', label: 'Client Database' },
+  founders:     { icon: '✦', label: "Founders' Collection" },
+  strategy:     { icon: '⊟', label: 'Strategy' },
+  settings:     { icon: '⊛', label: 'Settings' },
 }
 
 export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, onLogout }) {

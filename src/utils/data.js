@@ -99,18 +99,61 @@ export const MILESTONES_UPCOMING = [
 ]
 
 export const NAV = [
+  // Core — daily operations
   { id:'dashboard',  icon:'◈', label:'Dashboard',            group:'Core' },
   { id:'progress',   icon:'▸', label:'Business Progress',    group:'Core' },
   { id:'finance',    icon:'₩', label:'Finance Centre',       group:'Core' },
   { id:'actions',    icon:'✓', label:'Action Centre',        group:'Core' },
   { id:'documents',  icon:'◻', label:'Business Documents',   group:'Core' },
-  { id:'suppliers',  icon:'◎', label:'Suppliers',            group:'Products' },
-  { id:'products',   icon:'❧', label:'Products',             group:'Products' },
-  { id:'calculator', icon:'⊞', label:'Import Calculator',    group:'Products' },
-  { id:'checkers',   icon:'⊟', label:'Checkers Hyper',       group:'Products' },
-  { id:'founders',   icon:'✦', label:'Founders Collection',  group:'Products' },
-  { id:'strategy',   icon:'◉', label:'Strategy',             group:'Strategy' },
+  // Supplier Zone — all supplier, product, pricing and import activity
+  { id:'supplierzone', icon:'◎', label:'Supplier Zone',      group:'Supplier Zone' },
+  { id:'products',     icon:'❧', label:'Product Database',   group:'Supplier Zone' },
+  // Market — client and channel management
+  { id:'clients',    icon:'◉', label:'Client Database',      group:'Market' },
+  { id:'founders',   icon:'✦', label:'Founders Collection',  group:'Market' },
+  // Strategy — long-term planning and opportunities
+  { id:'strategy',   icon:'⊟', label:'Strategy',             group:'Strategy' },
+  // System
   { id:'settings',   icon:'⚙', label:'Settings',             group:'System' },
+]
+
+// ── CLIENT DATABASE ────────────────────────────────────────────────────────────
+// Preloaded prospects. Scalable to hundreds of organisations.
+export const CLIENT_SECTORS = [
+  'Healthcare', 'Education', 'Property', 'Hospitality',
+  'Retail', 'Corporate', 'Government', 'Designers & Architects',
+  'Developers', 'Other',
+]
+
+export const CLIENT_TYPES = [
+  'Strategic Account', 'Prospect', 'Existing Client',
+  'Designer', 'Developer', 'Hospitality', 'Government', 'Corporate', 'Other',
+]
+
+export const CLIENT_STATUSES = [
+  'Not Contacted', 'Researching', 'First Contact Made',
+  'Meeting Scheduled', 'Proposal Sent', 'Active Client', 'On Hold', 'Not Interested',
+]
+
+export const CLIENT_PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
+
+export const INIT_CLIENTS = [
+  // Healthcare
+  { id:101, company:'Mediclinic', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'mediclinic.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Large private hospital group — multiple facilities across SA. High volume opportunity for reception and waiting area greenery.', followUpDate:'' },
+  { id:102, company:'Netcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'netcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Second largest private hospital operator in SA. National footprint.', followUpDate:'' },
+  { id:103, company:'Life Healthcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'lifehealthcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Third major private hospital group. Strong presence in Gauteng and Western Cape.', followUpDate:'' },
+  // Education
+  { id:201, company:'Curro Holdings', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'curro.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Private school group with 60+ campuses. Reception and communal areas across network.', followUpDate:'' },
+  { id:202, company:'ADvTECH', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'advtech.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Owns Varsity College, Rosebank College, Crawford schools. Multiple campuses.', followUpDate:'' },
+  // Property
+  { id:301, company:'Growthpoint Properties', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'growthpoint.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'Facilities Management', notes:'Largest SA REIT. Owns major office parks and retail centres. Facilities budget driven.', followUpDate:'' },
+  { id:302, company:'Redefine Properties', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'redefine.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major property fund — offices and retail. Strong Gauteng presence.', followUpDate:'' },
+  { id:303, company:'Attacq', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'attacq.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Waterfall City developer. Premium lifestyle precinct — strong brand alignment.', followUpDate:'' },
+  // Hospitality
+  { id:401, company:'Village N Life', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'villagenlife.co.za', email:'', phone:'', hqAddress:'Cape Town', contactPerson:'', position:'', department:'', notes:'Cape-based hospitality group. Boutique hotels and resorts. Premium positioning aligns with Botanica Living brand.', followUpDate:'' },
+  { id:402, company:'Southern Sun', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'southernsun.com', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major hotel group across SA. Large footprint — reception, lobby, restaurant greenery opportunities.', followUpDate:'' },
+  // Retail (Checkers as strategic account)
+  { id:501, company:'Shoprite / Checkers Hyper', sector:'Retail', type:'Strategic Account', priority:'Critical', status:'Researching', website:'checkers.co.za', email:'', phone:'', hqAddress:'Brackenfell, Cape Town', contactPerson:'', position:'Category Buyer', department:'Non-Foods / Home', notes:'Priority anchor retail opportunity. Shop-in-shop concept for Checkers Hyper stores. Requires pitch deck, pilot proposal, buyer contact.', followUpDate:'' },
 ]
 
 export const FINANCE_CATEGORIES = {
