@@ -121,23 +121,27 @@ export function generateTOTPSecret() {
   return Array.from(bytes).map(b => CHARS[b % 32]).join('')
 }
 
-export function getTOTPQRUrl(secret, label = 'BotanicaLiving') {
-  const issuer = 'BotanicaLiving'
-  const uri = getTOTPUri(secret, label)
-  // Primary: Google Charts (widely reachable, no CORS issues for img tag)
+// Account name shown in Google Authenticator — human readable
+const TOTP_ISSUER  = 'Botanica Living'
+const TOTP_ACCOUNT = 'Aldo'   // shown as "Botanica Living (Aldo)" in GA
+
+export function getTOTPUri(secret) {
+  // RFC 6238 / Google Authenticator format.
+  // CRITICAL: do NOT include algorithm=, it causes GA to reject the URI on Android 12+.
+  // Label must be "issuer:account" — both parts visible in GA.
+  // Only include: secret, issuer, digits, period.
+  const label = `${TOTP_ISSUER}:${TOTP_ACCOUNT}`
+  return `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(TOTP_ISSUER)}&digits=6&period=30`
+}
+
+export function getTOTPQRUrl(secret) {
+  const uri = getTOTPUri(secret)
   return `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(uri)}`
 }
 
-// Fallback QR URL using a different service
-export function getTOTPQRUrlFallback(secret, label = 'BotanicaLiving') {
-  const uri = getTOTPUri(secret, label)
+export function getTOTPQRUrlFallback(secret) {
+  const uri = getTOTPUri(secret)
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=${encodeURIComponent(uri)}`
-}
-
-// Also export the raw otpauth URI so LoginScreen can display/copy it directly
-export function getTOTPUri(secret, label = 'BotanicaLiving') {
-  const issuer = 'BotanicaLiving'
-  return `otpauth://totp/${encodeURIComponent(issuer + ':' + label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`
 }
 
 export async function verifyTOTP(secret, userCode) {

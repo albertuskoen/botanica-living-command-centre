@@ -29,13 +29,22 @@ export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, onLo
         {/* Logo */}
         <div className="sidebar-logo">
           <div className="logo-mark">
-            <div className="logo-gem">✦</div>
+            <img
+              src="/botanica-logo.png"
+              alt="Botanica Living"
+              style={{
+                width:44, height:44, borderRadius:10, objectFit:'contain',
+                objectPosition:'center', background:'rgba(245,240,232,0.92)',
+                padding:4, flexShrink:0,
+                boxShadow:'0 2px 8px rgba(0,0,0,0.35)',
+              }}
+            />
             <div className="logo-text">
               <span className="wordmark">Botanica Living</span>
               <span className="sub">Command Centre</span>
             </div>
           </div>
-          <div className="logo-reg">Reg: 2026/444834/07 · v1.3</div>
+          <div className="logo-reg">Reg: 2026/444834/07 · v2.3</div>
         </div>
 
         {/* Nav */}

@@ -115,10 +115,10 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
       <div className="page-header">
         <div>
           <div className="page-title">Dashboard</div>
-          <div className="page-subtitle">Botanica Living Group · Executive Overview</div>
+          <div className="page-subtitle">Botanica Living · Premium Artificial Greenery</div>
         </div>
         <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontStyle:'italic', color:T.gold, opacity:0.85 }}>
-          "Sell first. Scale second."
+          Designed for Life. Inspired by Nature.
         </div>
       </div>
 
@@ -128,14 +128,23 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
         <div className="company-banner mb20" style={{ marginBottom:24 }}>
           <div className="banner-gem">✦</div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:20, position:'relative' }}>
-            <div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:26, color:T.goldBright, fontWeight:300, marginBottom:8, lineHeight:1.2 }}>
-                Botanica Living Group (Pty) Ltd
-              </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.38)', letterSpacing:'0.1em', marginBottom:14 }}>
-                Registration No: 2026/444834/07
-              </div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:18 }}>
+              <img
+                src="/botanica-logo.png"
+                alt="Botanica Living"
+                style={{ width:72, height:72, borderRadius:12, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.9)', padding:6, flexShrink:0, boxShadow:'0 4px 16px rgba(0,0,0,0.4)' }}
+              />
+              <div>
+                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:26, color:T.goldBright, fontWeight:300, marginBottom:4, lineHeight:1.2 }}>
+                  Botanica Living (Pty) Ltd
+                </div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', letterSpacing:'0.12em', marginBottom:4, textTransform:'uppercase' }}>
+                  Premium Artificial Greenery
+                </div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.28)', letterSpacing:'0.06em', marginBottom:14 }}>
+                  Reg: 2026/444834/07 · botanicaliving.co.za
+                </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 <span className="badge" style={{ background:'rgba(21,128,61,0.3)', color:'#6EE8A0', borderColor:'rgba(110,232,160,0.22)', fontSize:11 }}>
                   ● In Business
                 </span>
@@ -153,6 +162,7 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
                 }}>
                   {importerStatus === 'Completed' ? 'Importer ✓' : 'Importer Pending'}
                 </span>
+                </div>
               </div>
             </div>
             {/* Overall health ring */}

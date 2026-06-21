@@ -32,8 +32,13 @@ function Wrap({ children }) {
   return (
     <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0F2318 0%,#1A3828 60%,#102820 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
       <div style={{ textAlign:'center', marginBottom:28 }}>
+        <img
+          src="/botanica-logo.png"
+          alt="Botanica Living"
+          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.92)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
+        />
         <div style={S.logo}>Botanica Living</div>
-        <div style={S.sub}>Group Command Centre</div>
+        <div style={{ ...S.sub, marginTop:3 }}>Designed for Life. Inspired by Nature.</div>
       </div>
       <div style={S.card}>{children}</div>
     </div>
@@ -246,11 +251,11 @@ export default function LoginScreen({ onAuthenticated }) {
   // ── SETUP: 2FA (optional) ─────────────────────────────────────────────────
   // ── SETUP: 2FA (optional) ─────────────────────────────────────────────────
   if (step === 'setup_totp') {
-    const manualUri = getTOTPUri(totpSecret, 'BotanicaLiving')
+    const manualUri = getTOTPUri(totpSecret)
     // Try primary QR service; fallback and retry cycle through alternatives
     const QR_SOURCES = [
-      getTOTPQRUrl(totpSecret, 'BotanicaLiving'),
-      getTOTPQRUrlFallback(totpSecret, 'BotanicaLiving'),
+      getTOTPQRUrl(totpSecret),
+      getTOTPQRUrlFallback(totpSecret),
     ]
     const qrSrc = qrFailed === 1 ? QR_SOURCES[1] : QR_SOURCES[0]
     const showImg = qrFailed < 2   // hide image entirely only after both sources fail
@@ -322,7 +327,7 @@ export default function LoginScreen({ onAuthenticated }) {
             Manual setup key — use this if QR scan fails
           </div>
           <div style={{ fontSize:11, color:'rgba(232,192,122,0.6)', marginBottom:8, lineHeight:1.5 }}>
-            In Google Authenticator: tap <strong style={{color:'#E8C07A'}}>+</strong> → <strong style={{color:'#E8C07A'}}>Enter a setup key</strong> → Account: <em>BotanicaLiving</em> → Key: paste below → Type: Time-based
+            In Google Authenticator: tap <strong style={{color:'#E8C07A'}}>+</strong> → <strong style={{color:'#E8C07A'}}>Enter a setup key</strong> → Account name: <em>Botanica Living</em> → Your key: paste below → Type of key: <em>Time based</em>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <code style={{ fontSize:14, color:'#E8C07A', letterSpacing:'0.15em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.8 }}>

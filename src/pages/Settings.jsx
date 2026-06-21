@@ -11,7 +11,7 @@ import {
 import { OCR_AVAILABLE } from '../lib/ocr.js'
 import { getStorageUsage, clearAllFiles } from '../lib/fileStore.js'
 
-const APP_VERSION = '1.9.0'
+const APP_VERSION = '2.3.0'
 const DEVICE_ID = (() => {
   let id = localStorage.getItem('bl_device_id')
   if (!id) { id = `device-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; localStorage.setItem('bl_device_id', id) }
@@ -30,7 +30,7 @@ function stampRecords(records = [], deviceId) {
   return records.map(r => ({ sourceDevice:r.sourceDevice||deviceId, createdAt:r.createdAt||new Date().toISOString(), updatedAt:r.updatedAt||new Date().toISOString(), syncStatus:r.syncStatus||'local', ...r }))
 }
 function buildBackup(allData, deviceId) {
-  return { _meta:{ version:APP_VERSION, exportedAt:new Date().toISOString(), exportedFrom:deviceId, appName:'Botanica Living Group Command Centre', schemaVersion:3 },
+  return { _meta:{ version:APP_VERSION, exportedAt:new Date().toISOString(), exportedFrom:deviceId, appName:'Botanica Living Command Centre', schemaVersion:3 },
     data:{ suppliers:stampRecords(allData.suppliers||[],deviceId), products:stampRecords(allData.products||[],deviceId), finance:stampRecords(allData.finance||[],deviceId), tasks:stampRecords(allData.tasks||[],deviceId), documents:stampRecords(allData.documents||[],deviceId), progress:allData.progress, settings:{ deviceId, exportedAt:new Date().toISOString() } } }
 }
 function validateBackup(parsed) {
@@ -213,6 +213,56 @@ export default function Settings({ allData, onRestore, onLogout }) {
       </div>
 
       <div className="page-content">
+
+        {/* ── Business Profile ─────────────────────────────────────────── */}
+        <div className="settings-section">
+          <div style={{ display:'flex', alignItems:'center', gap:18, marginBottom:20 }}>
+            <img
+              src="/botanica-logo.png"
+              alt="Botanica Living"
+              style={{ width:72, height:72, borderRadius:12, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.94)', padding:6, flexShrink:0, boxShadow:`0 4px 16px rgba(0,0,0,0.12)` }}
+            />
+            <div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.forest, lineHeight:1.2, marginBottom:3 }}>
+                Botanica Living (Pty) Ltd
+              </div>
+              <div style={{ fontSize:11, color:T.gold, letterSpacing:'0.14em', textTransform:'uppercase', fontWeight:600, marginBottom:5 }}>
+                Premium Artificial Greenery
+              </div>
+              <div style={{ fontSize:12, color:T.textMid, fontStyle:'italic' }}>
+                Designed for Life. Inspired by Nature.
+              </div>
+            </div>
+          </div>
+          <InfoRow label="Registration"  value="2026/444834/07" />
+          <InfoRow label="Website"       value="botanicaliving.co.za" />
+          <InfoRow label="Email"         value="info@botanicaliving.co.za" />
+          <div style={{ marginTop:14, display:'flex', gap:10, flexWrap:'wrap' }}>
+            <a
+              href="https://botanicaliving.co.za"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-outline btn-sm"
+            >
+              🌐 Website
+            </a>
+            <a
+              href="mailto:info@botanicaliving.co.za"
+              className="btn btn-outline btn-sm"
+            >
+              ✉ Email Us
+            </a>
+            <a
+              href="https://wa.me/27834574300"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-outline btn-sm"
+              style={{ color:T.green, borderColor:T.green }}
+            >
+              💬 WhatsApp
+            </a>
+          </div>
+        </div>
 
         {/* ── Cloud Storage Status ─────────────────────────────────────── */}
         <div className="settings-section" style={{ border:`1px solid rgba(21,128,61,0.28)`, background:T.greenPale }}>
@@ -462,10 +512,12 @@ export default function Settings({ allData, onRestore, onLogout }) {
         <div className="settings-section">
           <div className="settings-title">App Information</div>
           {[
-            ['App',           'Botanica Living Group Command Centre'],
+            ['App',           'Botanica Living Command Centre'],
             ['Version',       `v${APP_VERSION}`],
-            ['Company',       'Botanica Living Group (Pty) Ltd'],
+            ['Company',       'Botanica Living (Pty) Ltd'],
             ['Registration',  '2026/444834/07'],
+            ['Website',       'botanicaliving.co.za'],
+            ['Contact',       'info@botanicaliving.co.za'],
             ['Device ID',     DEVICE_ID],
             ['localStorage',  getLocalStorageSize()],
             ['IndexedDB',     `${idbStorage.usedMB} MB used${idbStorage.quotaMB>0?` / ~${idbStorage.quotaMB} MB quota`:''}`],

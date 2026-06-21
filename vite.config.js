@@ -8,9 +8,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
-        name: 'Botanica Living Group',
+        name: 'Botanica Living',
         short_name: 'Botanica',
-        description: 'Botanica Living Group Command Centre',
+        description: 'Botanica Living · Premium Artificial Greenery',
         theme_color: '#0F2318',
         background_color: '#0F2318',
         display: 'standalone',
