@@ -143,64 +143,30 @@ async function extractCatalogWithClaude(rawText, supplierName, base64Data, apiKe
 }
 
 function buildCatalogExtractionPrompt(supplierName, rawText) {
-  return 'You are a product data extraction assistant for Botanica Living Group, a South African premium artificial greenery importer.
+  const fields = [
+    '"productName": ""', '"productCode": ""', '"category": ""',
+    '"height": ""', '"width": ""', '"potSize": ""',
+    '"colour": ""', '"material": ""', '"moq": ""',
+    '"unitPrice": ""', '"exwPrice": ""', '"fobPrice": ""',
+    '"cifPrice": ""', '"samplePrice": ""', '"currency": "USD"',
+    '"leadTime": ""', '"packagingNotes": ""', '"notes": ""',
+    '"confidence": 85',
+  ].map(f => '  ' + f).join(',
+')
 
-' +
-    'Supplier: ' + (supplierName || 'Unknown') + '
-
-' +
-    'Extract ALL products from the catalog below. Return ONLY a valid JSON array. No explanation, no markdown, no preamble.
-
-' +
-    'Each product object must have these fields (empty string if not found):
-' +
-    '{
-' +
-    '  "productName": "",
-' +
-    '  "productCode": "",
-' +
-    '  "category": "",
-' +
-    '  "height": "",
-' +
-    '  "width": "",
-' +
-    '  "potSize": "",
-' +
-    '  "colour": "",
-' +
-    '  "material": "",
-' +
-    '  "moq": "",
-' +
-    '  "unitPrice": "",
-' +
-    '  "exwPrice": "",
-' +
-    '  "fobPrice": "",
-' +
-    '  "cifPrice": "",
-' +
-    '  "samplePrice": "",
-' +
-    '  "currency": "USD",
-' +
-    '  "leadTime": "",
-' +
-    '  "packagingNotes": "",
-' +
-    '  "notes": "",
-' +
-    '  "confidence": 85
-' +
-    '}
-
-' +
-    'CATALOG TEXT:
-' +
+  return (
+    'You are a product data extraction assistant for Botanica Living Group, ' +
+    'a South African premium artificial greenery importer.\n\n' +
+    'Supplier: ' + (supplierName || 'Unknown') + '\n\n' +
+    'Extract ALL products from the catalog below. Return ONLY a valid JSON array. ' +
+    'No explanation, no markdown, no preamble.\n\n' +
+    'Each product object must have these fields (empty string if not found):\n' +
+    '{\n' + fields + '\n}\n\n' +
+    'CATALOG TEXT:\n' +
     rawText.slice(0, 8000)
+  )
 }
+
 
 // ── Claude Vision (for images and scanned PDFs) ────────────────────────────────
 async function extractWithClaudeVision(base64, mediaType, apiKey) {

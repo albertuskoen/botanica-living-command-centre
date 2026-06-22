@@ -65,6 +65,10 @@ function check(filepath) {
 
 walk(SRC_ROOT)
 
+// Also validate api/ serverless functions (Vercel bundles these too)
+const API_ROOT = new URL('../api', import.meta.url).pathname
+try { walk(API_ROOT) } catch (e) { /* api/ may not exist */ }
+
 // ── Check 4: bracket balance in export const array declarations ─────────────
 function checkArrayBalance(filepath) {
   const src = readFileSync(filepath, 'utf8')
@@ -107,7 +111,9 @@ for (const filepath of (() => {
       else if (['.js','.jsx'].includes(extname(full))) out.push(full)
     }
   }
-  w(SRC_ROOT); return out
+  w(SRC_ROOT)
+  try { w(new URL('../api', import.meta.url).pathname) } catch {}
+  return out
 })()) {
   checkArrayBalance(filepath)
 }
