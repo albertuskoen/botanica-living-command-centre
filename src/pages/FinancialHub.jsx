@@ -140,13 +140,8 @@ function MigrationPanel({ finance, expenses, setExpenses }) {
   const runMigration = () => {
     if (!report || pending.length === 0) return
     if (!window.confirm(
-      'Migrate ' + pending.length + ' expense records from Finance Centre to Financial Hub?
-
-' +
-      'Finance Centre data is NOT deleted.
-This is a safe copy operation.
-
-Proceed?'
+      'Migrate ' + pending.length + ' expense records from Finance Centre to Financial Hub?\n\n' +
+      'Finance Centre data is NOT deleted.\nThis is a safe copy operation.\n\nProceed?'
     )) return
     setMigrating(true)
     const mapped = pending.map(mapFinanceTxnToExpense)

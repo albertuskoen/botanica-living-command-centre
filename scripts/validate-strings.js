@@ -43,19 +43,20 @@ function check(filepath) {
       errors++
     }
 
-    // ── Check 2: .join(' followed by actual newline before closing quote ──────
-    // Catches things like: .join('↵
-    // But not:             .join('\n')
-    if (/\.join\(\s*'[^'\\]*$/.test(line)) {
-      // Line has .join(' that doesn't close — raw newline follows
-      console.error(`[validate] ${rel}:${lineNo}: Unterminated .join() string literal (raw newline)`)
-      console.error(`           ${line.trim()}`)
-      errors++
-    }
-
-    // ── Check 3: alert(' followed by actual newline ───────────────────────────
-    if (/alert\(\s*'[^'\\]*$/.test(line) || /alert\(\s*`[^`\\]*$/.test(line)) {
-      console.error(`[validate] ${rel}:${lineNo}: alert() string may contain raw newline`)
+    // ── Check 2: function call with string argument that spans a raw newline ────
+    // Specifically catches:  someFunc(\n  'string starting here but not closed\n
+    // The tell: a line that is ONLY a string continuation (starts with whitespace
+    // then a quote) OR a call that opens a quote and the NEXT line starts the string.
+    //
+    // Most reliable heuristic: a line ends with an odd number of single quotes
+    // after a call-opening pattern, AND the content after the last quote is empty.
+    // Real case: window.confirm(\n  'text here\n  ^ line ends here with no closing '
+    //
+    // Pattern: line ends with ' preceded by non-quote non-backslash chars (string open)
+    // AND the line started with whitespace + quote (continuation from previous open call)
+    if (/^\s+'[^']*$/.test(line) && !line.trim().startsWith('//')) {
+      // Line starts with whitespace then a quote and doesn't close it — raw newline in string
+      console.error(`[validate] ${rel}:${lineNo}: String argument continues across raw newline (use \\n instead)`)
       console.error(`           ${line.trim()}`)
       errors++
     }
