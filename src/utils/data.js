@@ -250,7 +250,7 @@ export const INIT_CLIENTS = [
     phone:'+27 21 430 4000', altPhone:'+27 21 430 4080', whatsapp:'+27 82 494 2154',
     email:'enquiries@villagenlife.events', altEmail:'chairmansoffice@villagenlife.com',
     hqAddress:'Camps Bay, Cape Town, South Africa', postalAddress:'',
-    contactPerson:'', position:'Chairman's Office', department:'Operations',
+    contactPerson:'', position:"Chairman's Office", department:'Operations',
     targetDepartments:'Operations, Procurement, Property, Guest Experience',
     notes:'Cape-based boutique hospitality group. Hotels and resorts across Western Cape. Premium positioning aligns directly with Botanica Living brand. Guest experience team influences lobby and room greening decisions.',
     followUpDate:'',
