@@ -14,6 +14,8 @@ export const INIT_PRODUCTS = [
   { id:6, name:'Boxwood Panel 60×60',      category:'Panels', supplier:'Campion / Trustfloral', sku:'TRF-BOX-6060', height:'60×60cm', moq:100, exwPrice:18, fobPrice:20.5, cifPrice:22, sampleCost:55, leadTime:'40 days', assembly:false, foundersCollection:true,  sampleStatus:'Received' },
 ]
 
+export const INIT_FINANCE = []
+
 export const INIT_PROGRESS = [
   {
     id: 1,
