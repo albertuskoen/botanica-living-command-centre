@@ -255,7 +255,7 @@ export default function App() {
             {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} />}
             {page === 'products'     && <Products products={safeProducts} setProducts={setProducts} suppliers={safeSuppliers} />}
             {page === 'clients'      && <ClientDatabase clients={safeClients} setClients={setClients} />}
-            {page === 'financialhub' && <FinancialHub quotes={safeQuotes} setQuotes={setQuotes} invoices={safeInvoices} setInvoices={setInvoices} expenses={safeExpenses} setExpenses={setExpenses} finance={safeFinance} clients={safeClients} suppliers={safeSuppliers} documents={safeDocuments} />}
+            {page === 'financialhub' && <FinancialHub quotes={safeQuotes} setQuotes={setQuotes} invoices={safeInvoices} setInvoices={setInvoices} expenses={safeExpenses} finance={safeFinance} clients={safeClients} suppliers={safeSuppliers} documents={safeDocuments} />}
             {page === 'founders'     && <FoundersCollection products={safeProducts} />}
             {page === 'strategy'     && <Strategy />}
             {page === 'settings'   && <Settings           allData={allData}         onRestore={onRestore} onLogout={handleLogout} />}

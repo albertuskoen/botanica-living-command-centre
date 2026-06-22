@@ -2,7 +2,7 @@
 // Single source of truth for all financial activity.
 // Data flows: Quotes → Invoices → AR → Cash Flow
 //             Expenses → Project Profitability
-// Tabs: Overview · Quotes · Invoices · Expenses · Profitability · AR Aging
+// Tabs: Overview · Quotes · Invoices · Profitability · AR Aging
 import React, { useState, useMemo, useCallback, useRef } from 'react'
 import { T } from '../utils/tokens.js'
 import { ZAR, fmtDate, nextId, today, parseNum, safeAmount } from '../utils/format.js'
@@ -1029,7 +1029,7 @@ function Profitability({ invoices, expenses }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN FINANCIAL HUB
 // ═════════════════════════════════════════════════════════════════════════════
-export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices, expenses, setExpenses, finance, clients, suppliers, documents }) {
+export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices, expenses, finance, clients, suppliers, documents }) {
   const [tab, setTab] = useState('overview')
 
   return (
@@ -1037,7 +1037,7 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
       <div className="page-header">
         <div>
           <div className="page-title">Financial Hub</div>
-          <div className="page-subtitle">Quotes · Invoices · Expenses · Profitability</div>
+          <div className="page-subtitle">Quotes · Invoices · Profitability</div>
         </div>
       </div>
 
@@ -1047,7 +1047,6 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
             { id:'overview',       label:'Overview' },
             { id:'quotes',         label:'Quotes' },
             { id:'invoices',       label:'Invoices' },
-            { id:'expenses',       label:'Expenses' },
             { id:'profitability',  label:'Profitability' },
           ].map(t=>(
             <div key={t.id} className={`tab ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>{t.label}</div>
@@ -1057,7 +1056,6 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
         {tab==='overview'      && <Overview quotes={quotes} invoices={invoices} expenses={expenses} finance={finance} />}
         {tab==='quotes'        && <Quotes quotes={quotes} setQuotes={setQuotes} clients={clients} invoices={invoices} setInvoices={setInvoices} />}
         {tab==='invoices'      && <Invoices invoices={invoices} setInvoices={setInvoices} clients={clients} />}
-        {tab==='expenses'      && <Expenses expenses={expenses} setExpenses={setExpenses} suppliers={suppliers} documents={documents} finance={finance} />}
         {tab==='profitability' && <Profitability invoices={invoices} expenses={expenses} />}
       </div>
     </div>
