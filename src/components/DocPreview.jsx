@@ -381,7 +381,7 @@ export default function DocPreview({ doc, rawText, onDownload, style, showDebug 
       {!loading && !loadErr && activeUrl && isPdf && pdfFailed && (
         <div style={{textAlign:'center',padding:'32px 20px',background:'rgba(228,221,208,0.3)',borderRadius:12}}>
           <div style={{fontSize:36,marginBottom:12,opacity:0.4}}>📄</div>
-          <div style={{fontFamily:"'Manrope',sans-serif",fontSize:19,color:T.forest,marginBottom:8}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,color:T.forest,marginBottom:8}}>
             {fileName}
           </div>
           <div style={{fontSize:13,color:T.textMid,marginBottom:16,maxWidth:320,margin:'0 auto 16px'}}>

@@ -113,7 +113,7 @@ export default function ClientDatabase({ clients, setClients }) {
       </div>
 
       {/* KPI */}
-      <div style={{ background:'rgba(15,26,20,0.70)', backdropFilter:'blur(16px)', borderBottom:`1px solid rgba(255,255,255,0.07)`, padding:'14px 36px' }}>
+      <div style={{ background:'rgba(255,255,255,0.55)', backdropFilter:'blur(16px)', borderBottom:`1px solid rgba(210,200,184,0.5)`, padding:'14px 36px' }}>
         <div className="grid-4">
           {[
             { label:'Total Organisations', val:safe.length,      color:T.forest },
@@ -123,7 +123,7 @@ export default function ClientDatabase({ clients, setClients }) {
           ].map(k=>(
             <div key={k.label} className="stat-card">
               <div className="stat-label">{k.label}</div>
-              <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:24, color:k.color, lineHeight:1, marginTop:4 }}>{k.val}</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:k.color, lineHeight:1, marginTop:4 }}>{k.val}</div>
             </div>
           ))}
         </div>
@@ -185,7 +185,7 @@ export default function ClientDatabase({ clients, setClients }) {
                   <div style={{ fontSize:10, color:PRIORITY_COLORS[c.priority]||T.textMid, fontWeight:700, letterSpacing:'0.08em', writingMode:'vertical-rl', transform:'rotate(180deg)', whiteSpace:'nowrap' }}>{c.priority}</div>
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:16, color:T.forest, marginBottom:2 }}>{safeStr(c.company)}</div>
+                  <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:T.forest, marginBottom:2 }}>{safeStr(c.company)}</div>
                   <div style={{ fontSize:12, color:T.textMid }}>
                     <span style={{ color:T.teal, fontWeight:600 }}>{c.sector}</span> · {c.type}
                     {c.contactPerson && ` · ${c.contactPerson}`}
@@ -209,9 +209,9 @@ export default function ClientDatabase({ clients, setClients }) {
           {/* Detail panel */}
           {sel && (
             <div className="g-card" style={{position:'sticky',top:80}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,paddingBottom:12,borderBottom:`1px solid rgba(255,255,255,0.07)`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,paddingBottom:12,borderBottom:`1px solid rgba(210,200,184,0.4)`}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:T.forest,lineHeight:1.2,overflowWrap:'break-word'}}>{sel.company}</div>
+                  <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.forest,lineHeight:1.2,overflowWrap:'break-word'}}>{sel.company}</div>
                   <div style={{fontSize:11,color:T.teal,letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:600,marginTop:3}}>{sel.sector} · {sel.type}</div>
                   <div style={{marginTop:5,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
                     <PriorityDot priority={sel.priority} />
@@ -232,14 +232,14 @@ export default function ClientDatabase({ clients, setClients }) {
                 ['HQ Address', sel.hqAddress||'—'],
                 ['Follow Up', sel.followUpDate?fmtDate(sel.followUpDate):'—'],
               ].map(([k,v])=>(
-                <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`,fontSize:12,gap:8}}>
+                <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid rgba(210,200,184,0.25)`,fontSize:12,gap:8}}>
                   <span style={{color:T.textMid,fontWeight:500,flexShrink:0}}>{k}</span>
                   <span style={{color:T.forest,textAlign:'right',wordBreak:'break-all'}}>{v}</span>
                 </div>
               ))}
 
               {sel.notes && (
-                <div style={{marginTop:10,padding:10,background:'rgba(255,255,255,0.04)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.65,overflowWrap:'break-word'}}>
+                <div style={{marginTop:10,padding:10,background:'rgba(228,221,208,0.4)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.65,overflowWrap:'break-word'}}>
                   {sel.notes}
                 </div>
               )}

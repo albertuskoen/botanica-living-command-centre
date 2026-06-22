@@ -103,7 +103,7 @@ export function Calculator() {
   const RRow = ({ label, value, bold, gold }) => (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
       <span style={{ fontSize:12, color: gold ? T.goldBright : 'rgba(255,255,255,0.52)' }}>{label}</span>
-      <span style={{ fontFamily:"'Manrope',sans-serif", fontSize: bold ? 24 : 19, color: gold ? T.white : T.goldBright }}>{value}</span>
+      <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize: bold ? 24 : 19, color: gold ? T.white : T.goldBright }}>{value}</span>
     </div>
   )
 
@@ -121,7 +121,7 @@ export function Calculator() {
               <button key={t} className={`btn ${term===t?'btn-primary':'btn-outline'}`} style={{ flex:1 }} onClick={() => setTerm(t)}>{t}</button>
             ))}
           </div>
-          <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'12px 16px' }}>
+          <div style={{ background:'rgba(228,221,208,0.4)', borderRadius:10, padding:'12px 16px' }}>
             <div style={{ fontWeight:700, fontSize:13, color:T.forest, marginBottom:6 }}>{info.label}</div>
             <div style={{ fontSize:12, color:T.textMid, marginBottom:4 }}>
               <span style={{ fontWeight:700, color:T.green }}>✓ Included: </span>{info.included}
@@ -193,7 +193,7 @@ export function Calculator() {
             <div className="calc-result">
               <div style={{ marginBottom:16 }}>
                 <div style={{ fontSize:9, letterSpacing:'0.24em', textTransform:'uppercase', color:T.gold, fontWeight:700 }}>Results · {term}</div>
-                <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:13, color:'rgba(255,255,255,0.36)', marginTop:3 }}>Per unit · based on inputs</div>
+                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, color:'rgba(255,255,255,0.36)', marginTop:3 }}>Per unit · based on inputs</div>
               </div>
               <RRow label={`Supplier Price (${term})`} value={USD(base)} />
               {term==='EXW' && <RRow label="+ China Local" value={USD(china)} />}
@@ -212,7 +212,7 @@ export function Calculator() {
               <RRow label="Gross Profit / unit" value={ZAR(gp)} />
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', padding:'8px 0' }}>
                 <span style={{ fontSize:12, color:'rgba(255,255,255,0.52)' }}>Botanica Margin %</span>
-                <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:30, color: gpPct>30?'#6EE8A0':T.goldBright }}>{pct(gpPct)}</span>
+                <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:30, color: gpPct>30?'#6EE8A0':T.goldBright }}>{pct(gpPct)}</span>
               </div>
             </div>
 
@@ -229,11 +229,11 @@ export function Calculator() {
                 { label:'↳ Sell-in',                   val:ZAR(sellIn), note:`${bm}% GM`, bold:true },
                 { label:'↳ Retail Price',              val:ZAR(retail), note:`${rm}% ret.`, bold:true },
               ].map((r,i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:`1px solid rgba(255,255,255,0.07)` }}>
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.3)` }}>
                   <span style={{ fontSize:12, color:r.bold?T.forest:T.textMid, fontWeight:r.bold?700:400 }}>{r.label}</span>
                   <div style={{ display:'flex', gap:10, alignItems:'center' }}>
                     {r.note && <span style={{ fontSize:10, color:T.gold, fontWeight:600 }}>{r.note}</span>}
-                    <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:16, color:r.bold?T.forest:T.textMid }}>{r.val}</span>
+                    <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:r.bold?T.forest:T.textMid }}>{r.val}</span>
                   </div>
                 </div>
               ))}
@@ -251,7 +251,7 @@ export function Calculator() {
                       {r.t==='EXW' ? 'All logistics your responsibility' : r.t==='FOB' ? 'Port to port your cost' : 'Freight & insurance included'}
                     </div>
                   </div>
-                  <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:22, color:r.t===term?T.forest:T.textMid }}>{ZAR(r.landed)}</div>
+                  <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:r.t===term?T.forest:T.textMid }}>{ZAR(r.landed)}</div>
                 </div>
               ))}
             </div>
@@ -321,7 +321,7 @@ export function CheckersHyper() {
             <div className="scenario-out">
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:9, letterSpacing:'0.24em', textTransform:'uppercase', color:T.gold, fontWeight:700 }}>Scenario Output</div>
-                <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:20, color:T.white, marginTop:4 }}>{stores} stores · {upsm} units/store/month</div>
+                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.white, marginTop:4 }}>{stores} stores · {upsm} units/store/month</div>
               </div>
               <div className="grid-2" style={{ marginBottom:20 }}>
                 {[
@@ -338,11 +338,11 @@ export function CheckersHyper() {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', padding:'12px 0', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ fontSize:12, color:'rgba(255,255,255,0.45)' }}>Botanica Margin</span>
-                <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:24, color:T.goldBright }}>{pct(gpPct)}</span>
+                <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:T.goldBright }}>{pct(gpPct)}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', padding:'12px 0', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ fontSize:12, color:'rgba(255,255,255,0.45)' }}>Est. 40ft Containers / Year</span>
-                <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:24, color:T.goldBright }}>~{ctnrs}</span>
+                <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:T.goldBright }}>~{ctnrs}</span>
               </div>
             </div>
             <div className="g-card">
@@ -352,7 +352,7 @@ export function CheckersHyper() {
                 'Negotiate consignment or sale-or-return for the pilot phase.',
                 'Each store is a showroom for commercial and designer referrals.',
               ].map((n,i) => (
-                <div key={i} style={{ display:'flex', gap:12, padding:'9px 0', borderBottom:`1px solid rgba(255,255,255,0.07)` }}>
+                <div key={i} style={{ display:'flex', gap:12, padding:'9px 0', borderBottom:`1px solid rgba(210,200,184,0.3)` }}>
                   <div style={{ width:6, height:6, borderRadius:'50%', background:T.gold, marginTop:7, flexShrink:0 }} />
                   <div style={{ fontSize:13, color:T.textMid }}>{n}</div>
                 </div>
@@ -376,7 +376,7 @@ export function FoundersCollection({ products }) {
     <div>
       <div className="page-header">
         <div><div className="page-title">Founders Collection</div><div className="page-subtitle">Launch Range — Premium Selection</div></div>
-        <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:13, fontStyle:'italic', color:T.gold }}>{founders.length} products</div>
+        <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:13, fontStyle:'italic', color:T.gold }}>{founders.length} products</div>
       </div>
       <div className="page-content">
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:20 }}>
@@ -397,7 +397,7 @@ export function FoundersCollection({ products }) {
             </div>
           ))}
         </div>
-        {founders.length===0 && <div className="empty-st"><div className="empty-ic">✦</div><div style={{ fontFamily:"'Manrope',sans-serif", fontSize:20, color:T.forest }}>No Founders Collection products.</div><div style={{ fontSize:13, color:T.textMid, marginTop:6 }}>Edit any product and enable the Founders Collection flag.</div></div>}
+        {founders.length===0 && <div className="empty-st"><div className="empty-ic">✦</div><div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.forest }}>No Founders Collection products.</div><div style={{ fontSize:13, color:T.textMid, marginTop:6 }}>Edit any product and enable the Founders Collection flag.</div></div>}
       </div>
     </div>
   )
@@ -462,7 +462,7 @@ export function Strategy() {
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10,flexWrap:'wrap',gap:8}}>
                   <div style={{display:'flex',gap:10,alignItems:'center'}}>
                     <span style={{fontSize:20,color:T.gold}}>{opp.icon}</span>
-                    <div style={{fontFamily:"'Manrope',sans-serif",fontSize:17,color:T.forest}}>{opp.title}</div>
+                    <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:T.forest}}>{opp.title}</div>
                   </div>
                   <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,
                     background:opp.priority==='Critical'?T.redPale:opp.priority==='High'?T.goldPale:'rgba(161,161,170,0.1)',
@@ -473,7 +473,7 @@ export function Strategy() {
                 <div style={{fontSize:13,color:T.textMid,lineHeight:1.7,marginBottom:12}}>{opp.body}</div>
                 <div className="sec-label" style={{fontSize:9,marginBottom:6}}>Actions required</div>
                 {opp.actions.map(a=>(
-                  <div key={a} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`,fontSize:12,color:T.textMid}}>
+                  <div key={a} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid rgba(210,200,184,0.25)`,fontSize:12,color:T.textMid}}>
                     <span style={{color:T.gold,flexShrink:0}}>→</span>{a}
                   </div>
                 ))}
@@ -491,9 +491,9 @@ export function Strategy() {
             ].map(col => (
               <div className="g-card" key={col.title}>
                 <div style={{fontSize:18,marginBottom:8,color:T.gold}}>{col.icon}</div>
-                <div style={{fontFamily:"'Manrope',sans-serif",fontSize:17,color:T.forest,marginBottom:12}}>{col.title}</div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:T.forest,marginBottom:12}}>{col.title}</div>
                 {col.items.map(item => (
-                  <div key={item} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`,fontSize:13,color:T.textMid}}>
+                  <div key={item} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:`1px solid rgba(210,200,184,0.3)`,fontSize:13,color:T.textMid}}>
                     <span style={{color:T.gold}}>—</span>{item}
                   </div>
                 ))}

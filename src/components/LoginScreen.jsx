@@ -16,26 +16,26 @@ import {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
-  logo:  { fontFamily:"'Manrope',sans-serif", fontSize:26, fontWeight:600, color:'#E8C07A', letterSpacing:'0.04em' },
-  sub:   { fontSize:11, color:'rgba(232,192,122,0.55)', letterSpacing:'0.18em', textTransform:'uppercase', marginTop:4 },
-  card:  { background:'rgba(15,26,20,0.75)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:400, boxSizing:'border-box' },
-  label: { color:'rgba(232,192,122,0.7)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:4, marginTop:18 },
-  input: { width:'100%', boxSizing:'border-box', padding:'13px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(11,20,16,0.70)', color:'#E8C07A', fontSize:16, outline:'none', marginTop:2, fontFamily:"'Inter',sans-serif", WebkitAppearance:'none' },
-  btn:   { width:'100%', padding:'14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,rgba(46,74,52,0.9),rgba(31,43,33,0.95))', color:'#0F1A14', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:14, letterSpacing:'0.04em' },
-  ghost: { background:'none', border:'none', color:'rgba(232,192,122,0.55)', fontSize:12, cursor:'pointer', padding:'6px 0', textDecoration:'underline' },
-  err:   { color:'#F87171', fontSize:12, marginTop:10, textAlign:'center', lineHeight:1.5 },
+  logo:  { fontFamily:"'Cormorant Garamond',serif", fontSize:28, fontWeight:600, color:'#0F2318', letterSpacing:'0.04em' },
+  sub:   { fontSize:11, color:'#B8975A', letterSpacing:'0.18em', textTransform:'uppercase', marginTop:4 },
+  card:  { background:'rgba(255,255,255,0.85)', border:'1px solid rgba(210,200,184,0.6)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:400, boxSizing:'border-box', boxShadow:'0 8px 40px rgba(15,35,24,0.08)' },
+  label: { color:'#52525B', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:4, marginTop:18 },
+  input: { width:'100%', boxSizing:'border-box', padding:'13px 14px', borderRadius:10, border:'1px solid #D2C9B8', background:'#FFFFFF', color:'#0F2318', fontSize:16, outline:'none', marginTop:2, fontFamily:"'Inter',sans-serif", WebkitAppearance:'none' },
+  btn:   { width:'100%', padding:'14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#B8975A,#CFA96E)', color:'#0F2318', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:14, letterSpacing:'0.04em' },
+  ghost: { background:'none', border:'none', color:'#B8975A', fontSize:12, cursor:'pointer', padding:'6px 0', textDecoration:'underline' },
+  err:   { color:'#DC2626', fontSize:12, marginTop:10, textAlign:'center', lineHeight:1.5 },
   ok:    { color:'#86EFAC', fontSize:12, marginTop:10, textAlign:'center' },
 }
 
 // ── Shared wrapper ─────────────────────────────────────────────────────────────
 function Wrap({ children }) {
   return (
-    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0B1410 0%,#0F1A14 50%,#080E0A 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0F2318 0%,#1A3828 60%,#102820 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
       <div style={{ textAlign:'center', marginBottom:28 }}>
         <img
           src="/botanica-logo.png"
           alt="Botanica Living"
-          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(15,26,20,0.80)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
+          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.92)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
         />
         <div style={S.logo}>Botanica Living</div>
         <div style={{ ...S.sub, marginTop:3 }}>Designed for Life. Inspired by Nature.</div>
@@ -49,8 +49,8 @@ function Wrap({ children }) {
 function H({ title, sub }) {
   return (
     <div style={{ marginBottom:20 }}>
-      <div style={{ color:'#E8C07A', fontSize:18, fontWeight:600, marginBottom:4 }}>{title}</div>
-      {sub && <div style={{ color:'rgba(232,192,122,0.55)', fontSize:12, lineHeight:1.65 }}>{sub}</div>}
+      <div style={{ color:'#0F2318', fontSize:18, fontWeight:600, marginBottom:4 }}>{title}</div>
+      {sub && <div style={{ color:'#6B5A3E', fontSize:12, lineHeight:1.65 }}>{sub}</div>}
     </div>
   )
 }
@@ -64,7 +64,7 @@ function CopyBtn({ text, label = 'Copy' }) {
   return (
     <button
       onClick={copy}
-      style={{ background:'rgba(184,151,90,0.15)', border:'1px solid rgba(184,151,90,0.3)', borderRadius:7, color:'#E8C07A', fontSize:11, padding:'5px 12px', cursor:'pointer', flexShrink:0 }}
+      style={{ background:'rgba(184,151,90,0.15)', border:'1px solid rgba(184,151,90,0.3)', borderRadius:7, color:'#0F2318', fontSize:11, padding:'5px 12px', cursor:'pointer', flexShrink:0 }}
     >
       {copied ? '✓ Copied' : label}
     </button>
@@ -203,7 +203,7 @@ export default function LoginScreen({ onAuthenticated }) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  if (step === null) return <Wrap><div style={{ color:'#E8C07A', textAlign:'center', padding:20 }}>Loading…</div></Wrap>
+  if (step === null) return <Wrap><div style={{ color:'#0F2318', textAlign:'center', padding:20 }}>Loading…</div></Wrap>
 
   // ── SETUP: Create PIN ─────────────────────────────────────────────────────
   if (step === 'setup_pin') return (
@@ -242,7 +242,7 @@ export default function LoginScreen({ onAuthenticated }) {
         {working ? 'Setting up…' : 'Create PIN & Continue →'}
       </button>
 
-      <div style={{ marginTop:14, fontSize:11, color:'rgba(232,192,122,0.45)', textAlign:'center', lineHeight:1.5 }}>
+      <div style={{ marginTop:14, fontSize:11, color:'#8B7355', textAlign:'center', lineHeight:1.5 }}>
         Next step: optional 2FA setup. You can skip 2FA and enter the app immediately.
       </div>
     </Wrap>
@@ -323,14 +323,14 @@ export default function LoginScreen({ onAuthenticated }) {
 
         {/* Manual setup key — always visible, not hidden in details */}
         <div style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(232,192,122,0.2)', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
-          <div style={{ fontSize:10, color:'rgba(232,192,122,0.55)', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:8 }}>
+          <div style={{ fontSize:10, color:'#6B5A3E', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:8 }}>
             Manual setup key — use this if QR scan fails
           </div>
-          <div style={{ fontSize:11, color:'rgba(232,192,122,0.6)', marginBottom:8, lineHeight:1.5 }}>
-            In Google Authenticator: tap <strong style={{color:'#E8C07A'}}>+</strong> → <strong style={{color:'#E8C07A'}}>Enter a setup key</strong> → Account name: <em>Botanica Living</em> → Your key: paste below → Type of key: <em>Time based</em>
+          <div style={{ fontSize:11, color:'#6B5535', marginBottom:8, lineHeight:1.5 }}>
+            In Google Authenticator: tap <strong style={{color:'#0F2318'}}>+</strong> → <strong style={{color:'#0F2318'}}>Enter a setup key</strong> → Account name: <em>Botanica Living</em> → Your key: paste below → Type of key: <em>Time based</em>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <code style={{ fontSize:14, color:'#E8C07A', letterSpacing:'0.15em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.8 }}>
+            <code style={{ fontSize:14, color:'#0F2318', letterSpacing:'0.15em', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.8 }}>
               {totpSecret.match(/.{1,4}/g)?.join(' ')}
             </code>
             <CopyBtn text={totpSecret} label="Copy" />
@@ -339,11 +339,11 @@ export default function LoginScreen({ onAuthenticated }) {
 
         {/* Full URI — collapsed but copyable */}
         <details style={{ marginBottom:12 }}>
-          <summary style={{ fontSize:11, color:'rgba(232,192,122,0.4)', cursor:'pointer', userSelect:'none' }}>
+          <summary style={{ fontSize:11, color:'#9B8365', cursor:'pointer', userSelect:'none' }}>
             Show full otpauth:// URI (for other apps)
           </summary>
           <div style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:6 }}>
-            <code style={{ fontSize:10, color:'rgba(232,192,122,0.45)', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.65 }}>{manualUri}</code>
+            <code style={{ fontSize:10, color:'#8B7355', wordBreak:'break-all', flex:1, fontFamily:'monospace', lineHeight:1.65 }}>{manualUri}</code>
             <CopyBtn text={manualUri} label="Copy" />
           </div>
         </details>
@@ -370,7 +370,7 @@ export default function LoginScreen({ onAuthenticated }) {
             onChange={e => setRemember(e.target.checked)}
             style={{ accentColor:'#B8975A', width:15, height:15 }}
           />
-          <label htmlFor="trust-s" style={{ color:'rgba(232,192,122,0.65)', fontSize:12, cursor:'pointer' }}>
+          <label htmlFor="trust-s" style={{ color:'#5B4A2E', fontSize:12, cursor:'pointer' }}>
             Trust this device (skip 2FA on next login here)
           </label>
         </div>
@@ -387,13 +387,13 @@ export default function LoginScreen({ onAuthenticated }) {
 
         {/* Skip — always prominent */}
         <button
-          style={{ ...S.btn, background:'transparent', color:'#E8C07A', border:'1px solid rgba(255,255,255,0.12)', marginTop:8 }}
+          style={{ ...S.btn, background:'transparent', color:'#0F2318', border:'1px solid rgba(232,192,122,0.3)', marginTop:8 }}
           onClick={skip2FA}
         >
           Skip 2FA — Enter App Now
         </button>
 
-        <div style={{ marginTop:10, fontSize:11, color:'rgba(232,192,122,0.38)', textAlign:'center', lineHeight:1.5 }}>
+        <div style={{ marginTop:10, fontSize:11, color:'#A09070', textAlign:'center', lineHeight:1.5 }}>
           You can enable 2FA at any time from Settings → Security.
         </div>
       </Wrap>
@@ -420,7 +420,7 @@ export default function LoginScreen({ onAuthenticated }) {
 
       <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:14 }}>
         <input type="checkbox" id="trust-l" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
-        <label htmlFor="trust-l" style={{ color:'rgba(232,192,122,0.6)', fontSize:12, cursor:'pointer' }}>Trust this device (skip 2FA)</label>
+        <label htmlFor="trust-l" style={{ color:'#6B5535', fontSize:12, cursor:'pointer' }}>Trust this device (skip 2FA)</label>
       </div>
 
       {error && <div style={S.err}>⚠ {error}</div>}
@@ -456,7 +456,7 @@ export default function LoginScreen({ onAuthenticated }) {
 
       <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:14 }}>
         <input type="checkbox" id="trust-t" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor:'#B8975A', width:15, height:15 }} />
-        <label htmlFor="trust-t" style={{ color:'rgba(232,192,122,0.6)', fontSize:12, cursor:'pointer' }}>Trust this device</label>
+        <label htmlFor="trust-t" style={{ color:'#6B5535', fontSize:12, cursor:'pointer' }}>Trust this device</label>
       </div>
 
       {error && <div style={S.err}>⚠ {error}</div>}

@@ -170,7 +170,7 @@ export default function LayoutHealth() {
         ].map(r => (
           <div key={r.key} style={{ background:'rgba(228,221,208,0.4)', borderRadius:8, padding:'10px 12px' }}>
             <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:T.textLight, fontWeight:600, marginBottom:3 }}>{r.key}</div>
-            <div style={{ fontSize:13, color: r.color || T.forest, fontFamily:"'Manrope',sans-serif", fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.val}</div>
+            <div style={{ fontSize:13, color: r.color || T.forest, fontFamily:"'Cormorant Garamond',serif", fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.val}</div>
           </div>
         ))}
       </div>
@@ -227,7 +227,7 @@ export default function LayoutHealth() {
         </summary>
         <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
           {[
-            { cat:'Typography',  items:['All body text ≥ 13px', 'Card titles use Manrope/Inter sans-serif', 'Labels use uppercase + letter-spacing', 'Descriptions have line-height ≥ 1.5', 'No text overflow in cards'] },
+            { cat:'Typography',  items:['All body text ≥ 13px', 'Card titles use Cormorant Garamond', 'Labels use uppercase + letter-spacing', 'Descriptions have line-height ≥ 1.5', 'No text overflow in cards'] },
             { cat:'Layout',      items:['All cards have min-width: 0', 'No horizontal body overflow', 'Page content has correct padding per breakpoint', 'Grids collapse correctly on phone', 'Sidebar hides on tablet/phone'] },
             { cat:'Touch',       items:['All buttons ≥ 44px height', 'Nav items ≥ 44px height', 'Form inputs ≥ 44px height on mobile', 'Touch targets spaced ≥ 8px apart', 'Checkboxes ≥ 18×18px'] },
             { cat:'Tables',      items:['All tables in .table-wrap', 'table-wrap has overflow-x: auto', 'td has text-overflow: ellipsis', 'th has white-space: nowrap', 'Horizontal scrollbar visible on Samsung'] },

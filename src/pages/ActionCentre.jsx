@@ -84,14 +84,14 @@ export default function ActionCentre({ tasks, setTasks }) {
       </div>
 
       {/* Stats bar */}
-      <div style={{ background:'rgba(15,26,20,0.60)', backdropFilter:'blur(12px)', borderBottom:`1px solid ${T.beigeDeep}`, padding:'14px 36px', display:'flex', gap:24, flexWrap:'wrap' }}>
+      <div style={{ background:'rgba(255,255,255,0.6)', backdropFilter:'blur(12px)', borderBottom:`1px solid ${T.beigeDeep}`, padding:'14px 36px', display:'flex', gap:24, flexWrap:'wrap' }}>
         {[
           { label:'Open Tasks', val:counts.open, color:T.forest },
           { label:'Critical',   val:counts.crit, color:T.danger },
           { label:'Completed',  val:counts.done, color:T.forestLight },
         ].map(s => (
           <div key={s.label} style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-            <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:28, color:s.color, lineHeight:1 }}>{s.val}</span>
+            <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:28, color:s.color, lineHeight:1 }}>{s.val}</span>
             <span style={{ fontSize:11, color:T.textLight, letterSpacing:'0.08em', textTransform:'uppercase' }}>{s.label}</span>
           </div>
         ))}

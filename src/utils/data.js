@@ -1,4 +1,4 @@
-// ── SEED DATA v2.4 ────────────────────────────────────────────────────────────
+// ── SEED DATA ─────────────────────────────────────────────────────────────────
 
 export const INIT_SUPPLIERS = [
   { id:1, name:'Frank / Dongyi', contact:'Frank Chen', country:'China', email:'frank@dongyi.cn', whatsapp:'+86 138 0000 1234', terms:'FOB', notes:'Primary supplier. Fast samples. Excellent quality on Olive & Ficus range.', status:'Active' },
@@ -32,7 +32,7 @@ export const INIT_PROGRESS = [
     { id:'bd3', name:'Email active: aldo@botanicaliving.co.za', status:'Completed', priority:'High', dueDate:'', notes:'' },
     { id:'bd4', name:'Website concept in progress', status:'In Progress', priority:'Medium', dueDate:'', notes:'Landing page to follow Founders Collection launch.' },
     { id:'bd5', name:'Email signature created', status:'Completed', priority:'Low', dueDate:'', notes:'' },
-    { id:'bd6', name:'Command Centre live', status:'Completed', priority:'High', dueDate:'', notes:'v2.4 deployed.' },
+    { id:'bd6', name:'Command Centre live', status:'Completed', priority:'High', dueDate:'', notes:'v1.2 deployed.' },
   ]},
   { section:'Supplier Development', icon:'❧', tasks:[
     { id:'sd1', name:'Frank / Dongyi relationship active', status:'Completed', priority:'Critical', dueDate:'', notes:'Primary supplier confirmed.' },
@@ -80,13 +80,6 @@ export const INIT_TASKS = [
 
 export const INIT_DOCUMENTS = []
 
-// ── FINANCIAL HUB INIT DATA ───────────────────────────────────────────────────
-
-export const INIT_QUOTES = []
-export const INIT_INVOICES = []
-export const INIT_EXPENSES = []
-export const INIT_PROJECTS = []
-
 export const MILESTONES_COMPLETED = [
   { label:'Company Registered', date:'2026' },
   { label:'SARS Registered', date:'2026' },
@@ -105,31 +98,28 @@ export const MILESTONES_UPCOMING = [
   { label:'First Container', status:'Not Started' },
 ]
 
-// ── Navigation v2.4 ───────────────────────────────────────────────────────────
 export const NAV = [
-  { id:'dashboard',    icon:'⬡', label:'Dashboard',          group:'Overview' },
+  // Core
+  { id:'dashboard',    icon:'⬡', label:'Dashboard',         group:'Core' },
   // Supplier Zone
-  { id:'supplierzone', icon:'◎', label:'Supplier Zone',       group:'Supply Chain' },
-  { id:'products',     icon:'❧', label:'Product Database',    group:'Supply Chain' },
-  // Client
-  { id:'clients',      icon:'◉', label:'Client Database',     group:'Market' },
-  { id:'founders',     icon:'✦', label:'Founders Collection', group:'Market' },
+  { id:'supplierzone', icon:'◎', label:'Supplier Zone',     group:'Supplier Zone' },
+  { id:'products',     icon:'❧', label:'Product Database',  group:'Supplier Zone' },
+  // Client Database
+  { id:'clients',      icon:'◉', label:'Client Database',   group:'Client Database' },
   // Financial Hub
-  { id:'finance-hub',  icon:'◈', label:'Financial Hub',       group:'Finance' },
-  { id:'quotes',       icon:'◻', label:'Quotes',              group:'Finance' },
-  { id:'invoices',     icon:'▣', label:'Invoices',            group:'Finance' },
-  { id:'expenses',     icon:'⊟', label:'Expenses',            group:'Finance' },
+  { id:'financialhub', icon:'₩', label:'Financial Hub',     group:'Financial Hub' },
   // Projects
-  { id:'projects',     icon:'⊞', label:'Projects',            group:'Operations' },
-  { id:'progress',     icon:'▸', label:'Business Progress',   group:'Operations' },
-  { id:'actions',      icon:'✓', label:'Action Centre',       group:'Operations' },
-  // Other
-  { id:'documents',    icon:'▤', label:'Documents',           group:'Resources' },
-  { id:'strategy',     icon:'⊟', label:'Strategy',            group:'Resources' },
-  { id:'settings',     icon:'⚙', label:'Settings',            group:'System' },
+  { id:'projects',     icon:'▸', label:'Projects & Tasks',  group:'Projects' },
+  // Documents
+  { id:'documents',    icon:'◻', label:'Documents',         group:'Documents' },
+  // Strategy
+  { id:'strategy',     icon:'⊟', label:'Strategy',          group:'Strategy' },
+  // System
+  { id:'settings',     icon:'⚙', label:'Settings',          group:'System' },
 ]
 
 // ── CLIENT DATABASE ────────────────────────────────────────────────────────────
+// Preloaded prospects. Scalable to hundreds of organisations.
 export const CLIENT_SECTORS = [
   'Healthcare', 'Education', 'Property', 'Hospitality',
   'Retail', 'Corporate', 'Government', 'Designers & Architects',
@@ -149,20 +139,38 @@ export const CLIENT_STATUSES = [
 export const CLIENT_PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
 
 export const INIT_CLIENTS = [
-  { id:101, company:'Mediclinic Southern Africa', sector:'Healthcare', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.mediclinic.co.za', email:'engage@mediclinic.co.za', phone:'+27 21 809 6500', altPhone:'+27 86 532 2557', whatsapp:'087 240 6367', hqAddress:'25 Du Toit Street, Stellenbosch, 7600', postalAddress:'PO Box 456, Stellenbosch, 7599', contactPerson:'', position:'', department:'Facilities / Procurement', notes:'Large private hospital group — reception, corridors, waiting areas across SA. Facilities and Procurement are key contacts. Targeting facilities management budget.', followUpDate:'' },
-  { id:102, company:'Netcare Group', sector:'Healthcare', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.netcare.co.za', email:'customer.service@netcare.co.za', phone:'0860 638 2273', altPhone:'', whatsapp:'', hqAddress:'76 Maude Street, Sandton, 2196', postalAddress:'', contactPerson:'', position:'', department:'Facilities / Procurement', notes:'Second largest private hospital operator in SA. National footprint — strong Gauteng presence. Target Capital Projects and Facilities Management.', followUpDate:'' },
-  { id:103, company:'Life Healthcare', sector:'Healthcare', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.lifehealthcare.co.za', email:'customer.service@lifehealthcare.co.za', phone:'+27 11 219 9000', altPhone:'+27 11 219 9111', whatsapp:'', hqAddress:'203 Oxford Road, Dunkeld, Johannesburg, 2196', postalAddress:'', contactPerson:'', position:'', department:'Facilities Management / Procurement', notes:'Third major private hospital group. Strong Gauteng and Western Cape presence. Multiple campuses — reception and communal areas.', followUpDate:'' },
-  { id:201, company:'Curro Holdings', sector:'Education', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://www.curro.co.za', email:'engage@curro.co.za', phone:'+27 21 979 1204', altPhone:'+27 21 979 1205', whatsapp:'', hqAddress:'9 Parc du Cap, Mispel Street, Bellville, Cape Town, 7530', postalAddress:'PO Box 2436, Durbanville, 7551', contactPerson:'', position:'', department:'Facilities / New Campus Development', notes:'Private school group with 60+ campuses. Reception and communal areas across network. Target Facilities and New Campus Development.', followUpDate:'' },
-  { id:202, company:'ADvTECH Group', sector:'Education', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://www.groupadvtech.com', email:'info@groupadvtech.com', phone:'+27 11 676 8000', altPhone:'', whatsapp:'', hqAddress:'Inanda Greens Office Park, 54 Wierda Road West, Sandton, 2196', postalAddress:'', contactPerson:'', position:'', department:'Facilities / Procurement', notes:'Owns Varsity College, Rosebank College, Crawford schools. Multiple campuses — strong national footprint.', followUpDate:'' },
-  { id:301, company:'Growthpoint Properties', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.growthpoint.co.za', email:'info@growthpoint.co.za', phone:'+27 11 944 6000', altPhone:'+27 21 673 8400', whatsapp:'', hqAddress:'The Place, 1 Sandton Drive, Sandton', postalAddress:'', contactPerson:'', position:'', department:'Facilities / Property Management', notes:'Largest SA REIT. Offices, retail centres, industrial. Facilities budget driven. Cape Town: MontClare Place, Claremont. Durban: Lincoln on The Lake, Umhlanga.', followUpDate:'' },
-  { id:302, company:'Redefine Properties', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.redefine.co.za', email:'', phone:'+27 11 283 0000', altPhone:'', whatsapp:'', hqAddress:'155 West Street, Sandown, Sandton, 2196', postalAddress:'', contactPerson:'', position:'', department:'Property Management / Tenant Installations', notes:'Major property fund — offices and retail. Strong Gauteng presence. Target Tenant Installations and Facilities.', followUpDate:'' },
-  { id:303, company:'Attacq Limited', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'https://www.attacq.co.za', email:'reception@attacq.co.za', phone:'+27 10 549 1050', altPhone:'+27 12 010 3457', whatsapp:'', hqAddress:'Ground Floor, Nexus Waterfall, 44 Magwa Crescent, Waterfall City, 2090', postalAddress:'', contactPerson:'', position:'', department:'Leasing / Waterfall City Projects', notes:'Waterfall City developer. Premium lifestyle precinct — strong brand alignment. Target Leasing, Developments and Property Management.', followUpDate:'' },
-  { id:401, company:'Village N Life', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://www.villagenlife.com', email:'chairmansoffice@villagenlife.com', phone:'+27 21 430 4000', altPhone:'+27 82 494 2154', whatsapp:'', hqAddress:'7 Chilworth Road, Camps Bay, Cape Town, 8005', postalAddress:'', contactPerson:'', position:'', department:'Group Operations / Procurement', notes:'Cape-based hospitality group. Boutique hotels and resorts. Events: 69 Victoria Road, Camps Bay. Chairman direct line available.', followUpDate:'' },
-  { id:402, company:'Southern Sun', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://www.southernsun.com', email:'companysecretary@southernsun.com', phone:'0861 44 77 44', altPhone:'+27 11 461 9744', whatsapp:'', hqAddress:'Palazzo Towers West, Montecasino Boulevard, Johannesburg, 2055', postalAddress:'', contactPerson:'', position:'', department:'Procurement / Hotel Refurbishments', notes:'Major hotel group across SA. Large footprint — reception, lobby, restaurant greenery. Target Procurement and Hotel Refurbishments.', followUpDate:'' },
-  { id:403, company:'Tsogo Sun', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://www.tsogosun.com', email:'tsogosun.contactus@tsogosun.com', phone:'+27 11 510 7700', altPhone:'+27 10 595 9149', whatsapp:'', hqAddress:'Palazzo Towers East, Montecasino Boulevard, Fourways, 2055', postalAddress:'Private Bag X190, Bryanston, 2021', contactPerson:'', position:'', department:'Procurement / Casino & Hotel Refurbishments', notes:'Hospitality, entertainment and property group. Casino hotel network across SA — strong recurring refurbishment cycle.', followUpDate:'' },
-  { id:404, company:'City Lodge Hotel Group', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'https://citylodgehotels.com', email:'info@citylodgehotels.com', phone:'+27 11 557 2600', altPhone:'0800 11 37 90', whatsapp:'', hqAddress:'Bryanston Gate Office Park, Corner Homestead Avenue and Main Road, Bryanston', postalAddress:'', contactPerson:'', position:'', department:'Procurement / Facilities', notes:'Major hotel group — wide SA network. Target Procurement and Facilities for reception and communal area greenery.', followUpDate:'' },
-  { id:501, company:'Shoprite / Checkers Hyper', sector:'Retail', type:'Strategic Account', priority:'Critical', status:'Researching', website:'https://www.checkers.co.za', email:'', phone:'', altPhone:'', whatsapp:'', hqAddress:'Brackenfell, Cape Town', postalAddress:'', contactPerson:'', position:'Category Buyer', department:'Non-Foods / Home', notes:'PRIORITY anchor retail opportunity. Shop-in-shop concept for Checkers Hyper stores nationally. Requires pitch deck, pilot proposal and buyer contact in Non-Foods/Home at Shoprite Holdings. Each store = showroom for designers and commercial referrals.', followUpDate:'' },
+  // Healthcare
+  { id:101, company:'Mediclinic', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'mediclinic.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Large private hospital group — multiple facilities across SA. High volume opportunity for reception and waiting area greenery.', followUpDate:'' },
+  { id:102, company:'Netcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'netcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Second largest private hospital operator in SA. National footprint.', followUpDate:'' },
+  { id:103, company:'Life Healthcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'lifehealthcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Third major private hospital group. Strong presence in Gauteng and Western Cape.', followUpDate:'' },
+  // Education
+  { id:201, company:'Curro Holdings', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'curro.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Private school group with 60+ campuses. Reception and communal areas across network.', followUpDate:'' },
+  { id:202, company:'ADvTECH', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'advtech.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Owns Varsity College, Rosebank College, Crawford schools. Multiple campuses.', followUpDate:'' },
+  // Property
+  { id:301, company:'Growthpoint Properties', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'growthpoint.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'Facilities Management', notes:'Largest SA REIT. Owns major office parks and retail centres. Facilities budget driven.', followUpDate:'' },
+  { id:302, company:'Redefine Properties', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'redefine.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major property fund — offices and retail. Strong Gauteng presence.', followUpDate:'' },
+  { id:303, company:'Attacq', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'attacq.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Waterfall City developer. Premium lifestyle precinct — strong brand alignment.', followUpDate:'' },
+  // Hospitality
+  { id:401, company:'Village N Life', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'villagenlife.co.za', email:'', phone:'', hqAddress:'Cape Town', contactPerson:'', position:'', department:'', notes:'Cape-based hospitality group. Boutique hotels and resorts. Premium positioning aligns with Botanica Living brand.', followUpDate:'' },
+  { id:402, company:'Southern Sun', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'southernsun.com', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major hotel group across SA. Large footprint — reception, lobby, restaurant greenery opportunities.', followUpDate:'' },
+  // Retail (Checkers as strategic account)
+  { id:501, company:'Shoprite / Checkers Hyper', sector:'Retail', type:'Strategic Account', priority:'Critical', status:'Researching', website:'checkers.co.za', email:'', phone:'', hqAddress:'Brackenfell, Cape Town', contactPerson:'', position:'Category Buyer', department:'Non-Foods / Home', notes:'Priority anchor retail opportunity. Shop-in-shop concept for Checkers Hyper stores. Requires pitch deck, pilot proposal, buyer contact.', followUpDate:'' },
 ]
+
+// ── FINANCIAL HUB SEED DATA ────────────────────────────────────────────────────
+export const INIT_QUOTES    = []
+export const INIT_INVOICES  = []
+export const INIT_EXPENSES  = []
+
+export const QUOTE_STATUSES   = ['Draft','Sent','Accepted','Rejected','Expired']
+export const INVOICE_STATUSES = ['Draft','Sent','Partially Paid','Paid','Overdue']
+export const EXPENSE_CATEGORIES = [
+  'Samples','Freight','Customs & Clearing','Transport (SA)',
+  'Marketing','Website & Digital','Travel','Office & Admin',
+  'Compliance','Banking Fees','Other',
+]
+
+export const VAT_RATE = 0.15   // 15% SA VAT
 
 
 export const FINANCE_CATEGORIES = {
@@ -171,14 +179,4 @@ export const FINANCE_CATEGORIES = {
   'Business Expense': ['CIPC / Compliance','SARS / Tax','Domain & Email','Website & Digital','Supplier Samples','Freight & Courier','Customs & Clearing','Marketing','Product Development','Assembly & Packaging','Travel','Banking Fees','Other Expense'],
 }
 
-export const EXPENSE_CATEGORIES = [
-  'Samples','Freight','Clearing & Duty','Transport','Marketing',
-  'Website & Digital','Travel','Office','Salaries','Banking Fees',
-  'CIPC / Compliance','SARS / Tax','Assembly & Packaging','Other',
-]
-
 export const PAYMENT_METHODS = ['EFT','Cash','Card','PayPal','Wise','Other']
-
-export const QUOTE_STATUSES = ['Draft','Sent','Accepted','Rejected','Expired']
-export const INVOICE_STATUSES = ['Draft','Sent','Partially Paid','Paid','Overdue']
-export const PROJECT_STATUSES = ['Planning','Active','On Hold','Completed','Cancelled']
