@@ -98,7 +98,7 @@ const css = `
     font-size: var(--fs-base);
     line-height: var(--lh-base);
     color: ${T.text};
-    background: ${T.cream};
+    background: #F2EDE3;  /* botanical warm cream — slightly deeper than pure cream */
     background-image:
       radial-gradient(ellipse 70% 40% at 15% 0%,  rgba(45,90,61,0.07)  0%, transparent 55%),
       radial-gradient(ellipse 55% 35% at 85% 100%, rgba(184,151,90,0.06) 0%, transparent 50%);
@@ -270,6 +270,10 @@ const css = `
     margin-left: var(--sw); flex: 1;
     min-height: 100vh; min-width: 0; /* prevent flex overflow */
     display: flex; flex-direction: column;
+    /* Subtle botanical hint — very low opacity so content stays primary */
+    background-image:
+      radial-gradient(ellipse 55% 30% at 100% 0%,   rgba(90,140,80,0.055) 0%, transparent 65%),
+      radial-gradient(ellipse 35% 45% at 0%   100%, rgba(50,90,50,0.045)  0%, transparent 60%);
     /* Samsung: safe area right */
     padding-right: env(safe-area-inset-right, 0px);
   }

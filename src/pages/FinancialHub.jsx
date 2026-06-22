@@ -504,13 +504,20 @@ const BLANK_EXP = {
   docId:null, docName:'', docStoragePath:'', docPublicUrl:'',
 }
 
-function Expenses({ expenses, setExpenses, suppliers }) {
+function Expenses({ expenses, setExpenses, suppliers, documents }) {
   const [modal,     setModal]     = useState(false)
   const [editing,   setEdit]      = useState(null)
   const [form,      setForm]      = useState(BLANK_EXP)
   const [filterCat, setFilterCat] = useState('All')
-  const [preview,   setPreview]   = useState(null)  // expense record to preview doc for
-  const [uploading, setUploading] = useState(false)
+  const [preview,      setPreview]      = useState(null)   // expense record to preview doc for
+  const [docBrowser,   setDocBrowser]   = useState(null)   // expense id to link existing doc to
+  const [uploading,    setUploading]    = useState(false)
+  const safeDocs = Array.isArray(documents) ? documents : []
+  // Documents that are likely expense invoices (category=Invoices or uploaded via Finance Centre)
+  const linkableDocs = safeDocs.filter(d =>
+    d.category === 'Invoices' || d.category === 'Business Expense' ||
+    d.fileType === 'pdf' || d.fileType === 'jpg' || d.fileType === 'jpeg' || d.fileType === 'png'
+  )
   const fileRef = useRef()
   const F = k => e => setForm(f=>({...f,[k]:e.target.value}))
   const safe  = Array.isArray(expenses)  ? expenses  : []
@@ -564,6 +571,18 @@ function Expenses({ expenses, setExpenses, suppliers }) {
     input.type = 'file'; input.accept = '.pdf,.jpg,.jpeg,.png,.webp,.csv,.xlsx'
     input.onchange = e => { if (e.target.files[0]) handleDocUpload(expId, e.target.files[0]) }
     input.click()
+  }
+
+  // Link an existing document from Documents module to an expense (no duplication)
+  const linkExistingDoc = (expId, doc) => {
+    setExpenses(ee => ee.map(e => e.id === expId ? {
+      ...e,
+      docId:          doc.supabaseId || doc.id || doc.storagePath || '',
+      docName:        doc.fileName || doc.name || '',
+      docStoragePath: doc.storagePath || '',
+      docPublicUrl:   doc.publicUrl  || '',
+    } : e))
+    setDocBrowser(null)
   }
 
   const visible = filterCat==='All' ? safe : safe.filter(e=>e.category===filterCat)
@@ -636,10 +655,18 @@ function Expenses({ expenses, setExpenses, suppliers }) {
                       }}>⬇</button>
                     </>
                   ) : (
-                    <button className="btn btn-outline btn-xs" style={{color:T.textLight,borderStyle:'dashed'}}
-                      onClick={()=>triggerUpload(e.id)} disabled={uploading}>
-                      {uploading?'Uploading…':'📎 Attach invoice/receipt'}
-                    </button>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                      <button className="btn btn-outline btn-xs" style={{color:T.textLight,borderStyle:'dashed'}}
+                        onClick={()=>triggerUpload(e.id)} disabled={uploading}>
+                        {uploading?'Uploading…':'📎 Upload invoice'}
+                      </button>
+                      {linkableDocs.length > 0 && (
+                        <button className="btn btn-outline btn-xs" style={{color:T.teal,borderStyle:'dashed'}}
+                          onClick={()=>setDocBrowser(e.id)}>
+                          🔗 Link from Documents
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -650,6 +677,48 @@ function Expenses({ expenses, setExpenses, suppliers }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Document browser — link existing document to expense */}
+      {docBrowser && (
+        <div className="modal-overlay" onClick={()=>setDocBrowser(null)}>
+          <div className="modal" style={{width:'min(96vw,640px)',maxHeight:'80vh',display:'flex',flexDirection:'column',padding:0}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(210,200,184,0.5)`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+              <div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.forest}}>Link Document to Expense</div>
+                <div style={{fontSize:12,color:T.textMid,marginTop:2}}>Select a document already stored in the system. No duplication — one file, linked here.</div>
+              </div>
+              <button className="modal-close" onClick={()=>setDocBrowser(null)}>✕</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:14}}>
+              {linkableDocs.length === 0 ? (
+                <div className="empty-st"><div>No documents found in the system yet.</div></div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                  {linkableDocs.map(doc => (
+                    <div key={doc.id||doc.supabaseId} className="doc-card" style={{cursor:'pointer'}}
+                      onClick={()=>linkExistingDoc(docBrowser, doc)}>
+                      <div style={{fontSize:22,flexShrink:0}}>
+                        {(doc.fileType||'').toLowerCase()==='pdf'?'📄':'🖼'}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:600,color:T.forest,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {doc.fileName||doc.name||'Unnamed document'}
+                        </div>
+                        <div style={{fontSize:11,color:T.textMid}}>
+                          {doc.category} · {doc.dateUploaded||doc.date||''} · {doc.fileSize||''}
+                          {doc.storageBackend==='supabase' && <span style={{color:T.green,marginLeft:6,fontWeight:600}}>☁ Cloud</span>}
+                        </div>
+                        {doc.supplier && <div style={{fontSize:11,color:T.textLight}}>Supplier: {doc.supplier}</div>}
+                      </div>
+                      <button className="btn btn-primary btn-xs">Link →</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -793,7 +862,7 @@ function Profitability({ invoices, expenses }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN FINANCIAL HUB
 // ═════════════════════════════════════════════════════════════════════════════
-export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices, expenses, setExpenses, finance, clients, suppliers }) {
+export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices, expenses, setExpenses, finance, clients, suppliers, documents }) {
   const [tab, setTab] = useState('overview')
 
   return (
@@ -821,7 +890,7 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
         {tab==='overview'      && <Overview quotes={quotes} invoices={invoices} expenses={expenses} finance={finance} />}
         {tab==='quotes'        && <Quotes quotes={quotes} setQuotes={setQuotes} clients={clients} invoices={invoices} setInvoices={setInvoices} />}
         {tab==='invoices'      && <Invoices invoices={invoices} setInvoices={setInvoices} clients={clients} />}
-        {tab==='expenses'      && <Expenses expenses={expenses} setExpenses={setExpenses} suppliers={suppliers} />}
+        {tab==='expenses'      && <Expenses expenses={expenses} setExpenses={setExpenses} suppliers={suppliers} documents={documents} />}
         {tab==='profitability' && <Profitability invoices={invoices} expenses={expenses} />}
       </div>
     </div>

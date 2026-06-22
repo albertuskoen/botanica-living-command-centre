@@ -27,20 +27,103 @@ const S = {
   ok:    { color:'#86EFAC', fontSize:12, marginTop:10, textAlign:'center' },
 }
 
-// ── Shared wrapper ─────────────────────────────────────────────────────────────
+// ── Shared wrapper — premium botanical interior background ────────────────────
 function Wrap({ children }) {
   return (
-    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0F2318 0%,#1A3828 60%,#102820 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
-      <div style={{ textAlign:'center', marginBottom:28 }}>
+    <div style={{
+      minHeight: '100vh',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 16px',
+      fontFamily: "'Inter',sans-serif",
+      overflow: 'hidden',
+    }}>
+      {/* Botanical interior background — pure CSS, no external images */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 0,
+        background: `
+          linear-gradient(160deg,
+            #2C3B2D 0%,
+            #3D5242 18%,
+            #8B9E72 35%,
+            #C8B89A 52%,
+            #E8DCC8 65%,
+            #D4C4A0 78%,
+            #B8A882 88%,
+            #8C7A5E 100%
+          )
+        `,
+      }} />
+      {/* Sunlight wash from upper-right — warm interior glow */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 1,
+        background: `
+          radial-gradient(ellipse 70% 80% at 80% 10%,
+            rgba(255,240,200,0.55) 0%,
+            rgba(240,210,150,0.25) 40%,
+            transparent 75%
+          )
+        `,
+      }} />
+      {/* Deep botanical green on left — large plant silhouette */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 2,
+        background: `
+          radial-gradient(ellipse 45% 90% at -5% 60%,
+            rgba(15,45,20,0.85) 0%,
+            rgba(30,65,35,0.6)  30%,
+            rgba(60,90,55,0.3)  55%,
+            transparent 75%
+          )
+        `,
+      }} />
+      {/* Secondary plant mass — lower left */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 2,
+        background: `
+          radial-gradient(ellipse 35% 50% at 5% 95%,
+            rgba(20,55,25,0.8)  0%,
+            rgba(45,80,45,0.5)  35%,
+            transparent 65%
+          )
+        `,
+      }} />
+      {/* Right side plant — light greens */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 2,
+        background: `
+          radial-gradient(ellipse 30% 60% at 105% 75%,
+            rgba(70,100,60,0.7)  0%,
+            rgba(100,130,80,0.4) 35%,
+            transparent 65%
+          )
+        `,
+      }} />
+      {/* Floor/furniture warmth — bottom cream */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', zIndex: 2,
+        background: `linear-gradient(0deg, rgba(180,155,110,0.6) 0%, rgba(210,185,145,0.3) 50%, transparent 100%)`,
+      }} />
+      {/* Soft overall warm overlay to unify */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, zIndex: 3,
+        background: 'rgba(240,225,195,0.08)',
+        backdropFilter: 'blur(0.5px)',
+      }} />
+      {/* Content sits above all layers */}
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', marginBottom: 28 }}>
         <img
           src="/botanica-logo.png"
           alt="Botanica Living"
-          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.92)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
+          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.96)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 6px 32px rgba(0,0,0,0.25)', display:'block', margin:'0 auto 14px' }}
         />
-        <div style={S.logo}>Botanica Living</div>
-        <div style={{ ...S.sub, marginTop:3 }}>Designed for Life. Inspired by Nature.</div>
+        <div style={{ ...S.logo, color:'#FAFAF5', textShadow:'0 2px 12px rgba(0,0,0,0.4)' }}>Botanica Living</div>
+        <div style={{ ...S.sub, color:'rgba(232,200,140,0.9)', textShadow:'0 1px 6px rgba(0,0,0,0.35)' }}>Designed for Life. Inspired by Nature.</div>
       </div>
-      <div style={S.card}>{children}</div>
+      <div style={{ ...S.card, position:'relative', zIndex:10 }}>{children}</div>
     </div>
   )
 }
