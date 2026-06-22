@@ -79,6 +79,175 @@ function calcTotals(items, discountPct, applyVat) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// FINANCE CENTRE → FINANCIAL HUB MIGRATION UTILITY
+// Safe copy-based migration — Finance Centre data never deleted
+// ═════════════════════════════════════════════════════════════════════════════
+function mapFinanceTxnToExpense(txn) {
+  const CAT_MAP = {
+    'Freight & Shipping':'Freight','Customs & Clearing':'Customs & Clearing',
+    'Local Transport':'Transport (SA)','Transport (SA)':'Transport (SA)',
+    'Samples':'Samples','Marketing':'Marketing',
+    'Website':'Website & Digital','Website & Digital':'Website & Digital',
+    'Travel':'Travel','Office & Admin':'Office & Admin',
+    'Banking Fees':'Banking Fees','Compliance':'Compliance',
+  }
+  return {
+    id:              txn.id,
+    _migratedFrom:   'bl_finance',
+    _migrationId:    'fc_' + txn.id,
+    _originalType:   txn.type,
+    _originalSource: txn.source || 'manual',
+    supplier:        txn.supplierPayee   || '',
+    category:        CAT_MAP[txn.category] || txn.category || 'Other',
+    project:         '',
+    date:            txn.date            || '',
+    amount:          String(txn.amount   || 0),
+    vat:             String(txn.vatAmount || 0),
+    reference:       txn.invoiceNumber   || '',
+    notes:           [txn.notes, txn.description].filter(Boolean).join(' · ') || '',
+    receipt:         '',
+    docId:           txn.sourceDocId        || null,
+    docName:         txn.sourceFile         || '',
+    docStoragePath:  txn.sourceStoragePath  || '',
+    docPublicUrl:    txn.sourcePublicUrl    || '',
+  }
+}
+
+function MigrationPanel({ finance, expenses, setExpenses }) {
+  const [report,    setReport]    = useState(null)
+  const [migrating, setMigrating] = useState(false)
+  const [result,    setResult]    = useState(null)
+  const [expanded,  setExpanded]  = useState(false)
+
+  const finExpenses = useMemo(() =>
+    (finance || []).filter(t => t?.type === 'Business Expense'), [finance])
+  const alreadyDone = useMemo(() =>
+    (expenses || []).filter(e => e._migrationId).length, [expenses])
+  const pending = useMemo(() =>
+    finExpenses.filter(t => !(expenses||[]).some(e => e._migrationId === 'fc_' + t.id)),
+    [finExpenses, expenses])
+
+  if (finExpenses.length === 0 || alreadyDone === finExpenses.length) return null
+
+  const analyse = () => {
+    const withDocs = pending.filter(t => t.sourceDocId || t.sourceStoragePath)
+    const ocrRecs  = pending.filter(t => t.source==='ocr'||t.source==='tesseract'||t.source==='pdfjs')
+    const total    = pending.reduce((s,t) => s+(parseFloat(t.amount)||0), 0)
+    setReport({ count:pending.length, withDocs:withDocs.length, ocrRecs:ocrRecs.length, total })
+    setExpanded(true)
+  }
+
+  const runMigration = () => {
+    if (!report || pending.length === 0) return
+    if (!window.confirm(
+      'Migrate ' + pending.length + ' expense records from Finance Centre to Financial Hub?
+
+' +
+      'Finance Centre data is NOT deleted.
+This is a safe copy operation.
+
+Proceed?'
+    )) return
+    setMigrating(true)
+    const mapped = pending.map(mapFinanceTxnToExpense)
+    const currentIds = new Set((expenses||[]).map(e=>e._migrationId).filter(Boolean))
+    const newRecs    = mapped.filter(e => !currentIds.has(e._migrationId))
+    const totalBefore = (expenses||[]).reduce((s,e)=>s+(parseFloat(e.amount)||0), 0)
+    const merged      = [...(expenses||[]), ...newRecs]
+    const totalAfter  = merged.reduce((s,e)=>s+(parseFloat(e.amount)||0), 0)
+    if (newRecs.length !== pending.length) {
+      setResult({ ok:false, msg:'Deduplication mismatch — migration aborted. No data changed.' })
+      setMigrating(false); return
+    }
+    setExpenses(merged)
+    setResult({
+      ok:true, migrated:newRecs.length,
+      recordsBefore:(expenses||[]).length, recordsAfter:merged.length,
+      totalBefore, totalAfter,
+      docsPreserved:newRecs.filter(e=>e.docId).length,
+      ocrMigrated:newRecs.filter(e=>e._originalSource==='ocr'||e._originalSource==='tesseract').length,
+    })
+    setReport(null); setMigrating(false)
+  }
+
+  return (
+    <div style={{ marginBottom:16, border:'1.5px solid rgba(184,151,90,0.35)', borderRadius:12, overflow:'hidden' }}>
+      <div style={{ padding:'10px 14px', background:'rgba(184,151,90,0.08)', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}
+        onClick={()=>setExpanded(e=>!e)}>
+        <div>
+          <span style={{ fontWeight:700, fontSize:13, color:T.gold }}>Finance Centre records available to migrate</span>
+          <span style={{ fontSize:11, color:T.textMid, marginLeft:10 }}>{finExpenses.length - alreadyDone} not yet migrated</span>
+        </div>
+        <span style={{ fontSize:12, color:T.textMid }}>{expanded ? '▲' : '▼'}</span>
+      </div>
+      {expanded && (
+        <div style={{ padding:14 }}>
+          <div style={{ fontSize:12, color:T.textMid, marginBottom:12, lineHeight:1.7 }}>
+            Finance Centre has <strong>{finExpenses.length}</strong> Business Expense records
+            ({alreadyDone} already migrated, {pending.length} pending).
+            Finance Centre data is never deleted.
+          </div>
+          {!result && !report && (
+            <button className="btn btn-outline btn-sm" onClick={analyse}>📋 Analyse Before Migrating</button>
+          )}
+          {report && !result && (
+            <div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
+                {[
+                  ['Records to migrate', report.count],
+                  ['With documents',     report.withDocs],
+                  ['OCR records',        report.ocrRecs],
+                  ['Expense total',      'R ' + report.total.toFixed(2)],
+                ].map(([k,v])=>(
+                  <div key={k} style={{ padding:'6px 10px', background:'rgba(228,221,208,0.4)', borderRadius:8 }}>
+                    <div style={{ fontSize:10, color:T.textLight, textTransform:'uppercase', letterSpacing:'0.1em' }}>{k}</div>
+                    <div style={{ fontSize:15, fontWeight:700, color:T.forest, marginTop:2 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:T.green, padding:'8px 12px', background:T.greenPale, borderRadius:8, marginBottom:12 }}>
+                All document links and OCR records will be preserved. Finance Centre unchanged.
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className="btn btn-primary btn-sm" onClick={runMigration} disabled={migrating}>
+                  {migrating ? 'Migrating…' : 'Migrate ' + report.count + ' Records'}
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={()=>{setReport(null);setExpanded(false)}}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {result && (
+            <div style={{ padding:'12px 14px', background:result.ok?T.greenPale:T.redPale, border:'1px solid ' + (result.ok?'rgba(21,128,61,0.25)':'rgba(185,28,28,0.25)'), borderRadius:10, fontSize:12 }}>
+              {result.ok ? (
+                <>
+                  <div style={{ fontWeight:700, color:T.green, marginBottom:8 }}>Migration verified and complete</div>
+                  {[
+                    ['Records before', result.recordsBefore],
+                    ['Records after',  result.recordsAfter],
+                    ['Migrated',       result.migrated],
+                    ['Documents',      result.docsPreserved + ' preserved'],
+                    ['OCR records',    result.ocrMigrated + ' preserved'],
+                    ['Total before',   'R ' + result.totalBefore.toFixed(2)],
+                    ['Total after',    'R ' + result.totalAfter.toFixed(2)],
+                  ].map(([k,v])=>(
+                    <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid rgba(21,128,61,0.12)' }}>
+                      <span style={{ color:T.textMid }}>{k}</span>
+                      <span style={{ fontWeight:600, color:T.forest }}>{v}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ color:T.danger, fontWeight:600 }}>{result.msg}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═════════════════════════════════════════════════════════════════════════════
 function Overview({ quotes, invoices, expenses, finance }) {
@@ -504,7 +673,7 @@ const BLANK_EXP = {
   docId:null, docName:'', docStoragePath:'', docPublicUrl:'',
 }
 
-function Expenses({ expenses, setExpenses, suppliers, documents }) {
+function Expenses({ expenses, setExpenses, suppliers, documents, finance }) {
   const [modal,     setModal]     = useState(false)
   const [editing,   setEdit]      = useState(null)
   const [form,      setForm]      = useState(BLANK_EXP)
@@ -598,6 +767,9 @@ function Expenses({ expenses, setExpenses, suppliers, documents }) {
 
   return (
     <div>
+      {/* Migration panel — shows Finance Centre records available to import */}
+      <MigrationPanel finance={finance} expenses={expenses} setExpenses={setExpenses} />
+
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
         <div style={{fontSize:13,color:T.textMid}}>
           {safe.length} expense{safe.length!==1?'s':''} · Total: <strong style={{color:T.red}}>{ZAR(totalSpend)}</strong>
@@ -890,7 +1062,7 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
         {tab==='overview'      && <Overview quotes={quotes} invoices={invoices} expenses={expenses} finance={finance} />}
         {tab==='quotes'        && <Quotes quotes={quotes} setQuotes={setQuotes} clients={clients} invoices={invoices} setInvoices={setInvoices} />}
         {tab==='invoices'      && <Invoices invoices={invoices} setInvoices={setInvoices} clients={clients} />}
-        {tab==='expenses'      && <Expenses expenses={expenses} setExpenses={setExpenses} suppliers={suppliers} documents={documents} />}
+        {tab==='expenses'      && <Expenses expenses={expenses} setExpenses={setExpenses} suppliers={suppliers} documents={documents} finance={finance} />}
         {tab==='profitability' && <Profitability invoices={invoices} expenses={expenses} />}
       </div>
     </div>

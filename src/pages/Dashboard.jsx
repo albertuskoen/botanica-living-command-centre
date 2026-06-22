@@ -125,16 +125,17 @@ export default function Dashboard({ suppliers, products, finance, tasks, documen
       <div className="page-content">
 
         {/* ── Company Banner ──────────────────────────────────────────────── */}
-        {/* Botanical hero — layered CSS interior background wrapping the company banner */}
+        {/* Real botanical interior photo as hero background */}
         <div style={{
           position:'relative', borderRadius:24, marginBottom:24,
-          overflow:'hidden', boxShadow:'0 8px 40px rgba(15,40,20,0.22)',
+          overflow:'hidden', boxShadow:'0 8px 40px rgba(15,40,20,0.18)',
         }}>
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(145deg,#1C3A24 0%,#2D5238 22%,#4A7A55 44%,#3A6045 62%,#1E3528 82%,#131F18 100%)' }}/>
-          <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 65% 85% at 96% 5%, rgba(255,235,170,0.3) 0%, rgba(240,210,130,0.12) 45%, transparent 70%)' }}/>
-          <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 42% 100% at -8% 58%, rgba(10,30,15,0.75) 0%, rgba(25,60,30,0.5) 40%, transparent 70%)' }}/>
-          <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 35% 70% at 108% 70%, rgba(55,100,50,0.55) 0%, rgba(85,135,70,0.22) 45%, transparent 68%)' }}/>
-          <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'45%', background:'linear-gradient(0deg, rgba(12,28,16,0.42) 0%, transparent 100%)' }}/>
+          {/* Photo */}
+          <div style={{ position:'absolute', inset:0, backgroundImage:'url(/bg-interior.jpg)', backgroundSize:'cover', backgroundPosition:'center 30%' }}/>
+          {/* Dark overlay so white text stays readable */}
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,28,14,0.72) 0%, rgba(20,48,24,0.55) 45%, rgba(40,80,40,0.30) 75%, rgba(180,155,100,0.18) 100%)' }}/>
+          {/* Bottom fade */}
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'40%', background:'linear-gradient(0deg, rgba(8,22,12,0.50) 0%, transparent 100%)' }}/>
           <div className="company-banner mb20" style={{ marginBottom:0, background:'transparent', boxShadow:'none', border:'none', borderRadius:0, position:'relative', zIndex:2 }}>
           <div className="banner-gem">✦</div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:20, position:'relative' }}>

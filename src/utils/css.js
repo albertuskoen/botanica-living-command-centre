@@ -98,7 +98,12 @@ const css = `
     font-size: var(--fs-base);
     line-height: var(--lh-base);
     color: ${T.text};
-    background: #F2EDE3;  /* botanical warm cream — slightly deeper than pure cream */
+    background: #F2EDE3;  /* botanical warm cream */
+    /* Very faint photo echo — barely visible, adds warmth without distraction */
+    background-image: url(/bg-interior.jpg);
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
     background-image:
       radial-gradient(ellipse 70% 40% at 15% 0%,  rgba(45,90,61,0.07)  0%, transparent 55%),
       radial-gradient(ellipse 55% 35% at 85% 100%, rgba(184,151,90,0.06) 0%, transparent 50%);
@@ -270,6 +275,7 @@ const css = `
     margin-left: var(--sw); flex: 1;
     min-height: 100vh; min-width: 0; /* prevent flex overflow */
     display: flex; flex-direction: column;
+    background: rgba(242,237,227,0.93); /* cream wash over the body photo */
     /* Subtle botanical hint — very low opacity so content stays primary */
     background-image:
       radial-gradient(ellipse 55% 30% at 100% 0%,   rgba(90,140,80,0.055) 0%, transparent 65%),
