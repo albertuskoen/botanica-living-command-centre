@@ -600,13 +600,10 @@ export default function Settings({ allData, onRestore, onLogout }) {
                   .map(k => {
                     const raw = localStorage.getItem(k)
                     const arr = raw ? (() => { try { return JSON.parse(raw) } catch { return null } })() : null
-                    return `${k}: ${Array.isArray(arr) ? arr.length + ' records' : raw === null ? 'not set' : 'non-array'}`
+                    return k + ': ' + (Array.isArray(arr) ? arr.length + ' records' : raw === null ? 'not set' : 'non-array')
                   })
-                  .join('
-')
-                alert('Data Report:
-
-' + report)
+                  .join('\n')
+                alert('Data Report:\n\n' + report)
               }}
             >
               📋 Show Data Report
