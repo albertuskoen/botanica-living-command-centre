@@ -64,9 +64,56 @@ function check(filepath) {
 
 walk(SRC_ROOT)
 
+// ── Check 4: bracket balance in export const array declarations ─────────────
+function checkArrayBalance(filepath) {
+  const src = readFileSync(filepath, 'utf8')
+  const rel = filepath.replace(SRC_ROOT + '/', '')
+  const exportArrayRe = /export const (\w+)\s*=\s*\[/g
+  let m
+  while ((m = exportArrayRe.exec(src)) !== null) {
+    const name  = m[1]
+    const start = m.index
+    // Scan forward to find the matching close
+    let depth = 0, pos = start, found = false
+    for (; pos < src.length; pos++) {
+      if (src[pos] === '[') depth++
+      else if (src[pos] === ']') {
+        depth--
+        if (depth === 0) { found = true; break }
+      }
+    }
+    if (!found) {
+      console.error(`[validate] ${rel}: export const ${name} — unmatched opening bracket [`)
+      errors++
+      continue
+    }
+    // Check if there is an extra ] immediately after (ignoring whitespace/newlines)
+    const rest = src.slice(pos + 1).trimStart()
+    if (rest.startsWith(']')) {
+      console.error(`[validate] ${rel}: export const ${name} — extra ] after array close`)
+      errors++
+    }
+  }
+}
+
+// Walk again for bracket balance
+for (const filepath of (() => {
+  const out = []
+  function w(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = join(dir, e)
+      if (statSync(full).isDirectory()) w(full)
+      else if (['.js','.jsx'].includes(extname(full))) out.push(full)
+    }
+  }
+  w(SRC_ROOT); return out
+})()) {
+  checkArrayBalance(filepath)
+}
+
 if (errors > 0) {
-  console.error(`\n[validate] ${errors} string literal error(s) found. Fix before building.\n`)
+  console.error(`\n[validate] ${errors} error(s) found. Fix before building.\n`)
   process.exit(1)
 } else {
-  console.log('[validate] ✅ All string literals OK.')
+  console.log('[validate] ✅ All string literals and array brackets OK.')
 }

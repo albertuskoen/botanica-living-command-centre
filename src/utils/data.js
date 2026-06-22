@@ -306,7 +306,6 @@ export const INIT_CLIENTS = [
     followUpDate:'',
   },
 ]
-]
 
 // ── FINANCIAL HUB SEED DATA ────────────────────────────────────────────────────
 export const INIT_QUOTES    = []
