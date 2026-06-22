@@ -3,6 +3,7 @@ import css from './utils/css.js'
 import useLocalStorage from './hooks/useLocalStorage.js'
 import { flushSyncQueue, SUPABASE_CONFIGURED, loadDocumentsFromCloud, loadTransactionsFromCloud } from './lib/supabase.js'
 import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS, INIT_CLIENTS, INIT_QUOTES, INIT_INVOICES, INIT_EXPENSES } from './utils/data.js'
+import { readLocalStorage } from './hooks/useLocalStorage.js'
 import {
   isSessionValid, touchSession, clearSession, isIdleExpired, getAuthConfig,
 } from './lib/auth.js'
@@ -123,6 +124,26 @@ export default function App() {
   const [quotes,     setQuotes]     = useLocalStorage('bl_quotes',    INIT_QUOTES)
   const [invoices,   setInvoices]   = useLocalStorage('bl_invoices',  INIT_INVOICES)
   const [expenses,   setExpenses]   = useLocalStorage('bl_expenses',  INIT_EXPENSES)
+
+  // ── One-time seed recovery ─────────────────────────────────────────────────
+  // If a key exists in localStorage but is empty [], useLocalStorage returns []
+  // not the init seed. This effect runs once after mount to fix that silently.
+  useEffect(() => {
+    // Clients: if empty, reseed with INIT_CLIENTS
+    if (Array.isArray(clients) && clients.length === 0 && INIT_CLIENTS.length > 0) {
+      console.log('[Botanica] bl_clients empty — reseeding with', INIT_CLIENTS.length, 'records')
+      setClients(INIT_CLIENTS)
+    }
+    // Suppliers: if somehow emptied, restore seed
+    if (Array.isArray(suppliers) && suppliers.length === 0 && INIT_SUPPLIERS.length > 0) {
+      setSuppliers(INIT_SUPPLIERS)
+    }
+    // Products: if somehow emptied, restore seed
+    if (Array.isArray(products) && products.length === 0 && INIT_PRODUCTS.length > 0) {
+      setProducts(INIT_PRODUCTS)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // run once on mount only
 
   // ── Load from Supabase on mount (only when authenticated) ───────────────────
   useEffect(() => {

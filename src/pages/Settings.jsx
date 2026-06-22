@@ -538,6 +538,82 @@ export default function Settings({ allData, onRestore, onLogout }) {
 
         <LayoutHealth/>
 
+        {/* ── Data Diagnostics ────────────────────────────────────────────── */}
+        <div className="settings-section">
+          <div className="settings-title">🔍 Data Diagnostics</div>
+          <div style={{ fontSize:13, color:T.textMid, marginBottom:14, lineHeight:1.7 }}>
+            Shows exactly what is stored in each localStorage key. Use this to verify data is present.
+          </div>
+          {[
+            { key:'bl_clients',   label:'Client Database',   init:11 },
+            { key:'bl_suppliers', label:'Suppliers',         init:2  },
+            { key:'bl_products',  label:'Products',          init:6  },
+            { key:'bl_expenses',  label:'Expenses (Hub)',    init:0  },
+            { key:'bl_quotes',    label:'Quotes',            init:0  },
+            { key:'bl_invoices',  label:'Invoices',          init:0  },
+            { key:'bl_finance',   label:'Finance Centre Txn',init:0  },
+            { key:'bl_documents', label:'Documents',         init:0  },
+          ].map(row => {
+            const raw   = localStorage.getItem(row.key)
+            const data  = raw ? (() => { try { return JSON.parse(raw) } catch { return null } })() : null
+            const count = Array.isArray(data) ? data.length : (data === null ? 'not set' : 'non-array')
+            const ok    = typeof count === 'number' && count > 0
+            const empty = count === 0
+            return (
+              <div key={row.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:T.forest }}>{row.label}</div>
+                  <code style={{ fontSize:10, color:T.textLight }}>{row.key}</code>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:13, fontWeight:700,
+                    color: ok ? T.green : empty ? T.danger : T.textMid }}>
+                    {typeof count === 'number' ? `${count} records` : count}
+                  </span>
+                  {empty && row.init > 0 && (
+                    <span style={{ fontSize:11, color:T.gold }}>
+                      (seed has {row.init})
+                    </span>
+                  )}
+                  {raw === null && <span style={{ fontSize:11, color:T.textLight }}>key absent</span>}
+                </div>
+              </div>
+            )
+          })}
+          <div style={{ marginTop:14, display:'flex', gap:10, flexWrap:'wrap' }}>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                // Force reseed bl_clients with INIT_CLIENTS
+                import('../utils/data.js').then(m => {
+                  localStorage.setItem('bl_clients', JSON.stringify(m.INIT_CLIENTS))
+                  alert(`Reseeded client database with ${m.INIT_CLIENTS.length} records. Reload the app to see changes.`)
+                })
+              }}
+            >
+              ↺ Reseed Client Database
+            </button>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                const report = ['bl_clients','bl_suppliers','bl_products','bl_expenses','bl_quotes','bl_invoices','bl_finance','bl_documents']
+                  .map(k => {
+                    const raw = localStorage.getItem(k)
+                    const arr = raw ? (() => { try { return JSON.parse(raw) } catch { return null } })() : null
+                    return `${k}: ${Array.isArray(arr) ? arr.length + ' records' : raw === null ? 'not set' : 'non-array'}`
+                  })
+                  .join('
+')
+                alert('Data Report:
+
+' + report)
+              }}
+            >
+              📋 Show Data Report
+            </button>
+          </div>
+        </div>
+
         {/* ── Danger zone ─────────────────────────────────────────────── */}
         <div className="settings-section" style={{ border:`1px solid rgba(185,28,28,0.25)` }}>
           <div className="settings-title" style={{ color:T.danger }}>⚠ Danger Zone</div>
