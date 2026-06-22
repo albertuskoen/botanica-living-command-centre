@@ -11,7 +11,7 @@ import {
 import { OCR_AVAILABLE } from '../lib/ocr.js'
 import { getStorageUsage, clearAllFiles } from '../lib/fileStore.js'
 
-const APP_VERSION = '2.3.0'
+const APP_VERSION = '2.4.0'
 const DEVICE_ID = (() => {
   let id = localStorage.getItem('bl_device_id')
   if (!id) { id = `device-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; localStorage.setItem('bl_device_id', id) }
@@ -31,7 +31,7 @@ function stampRecords(records = [], deviceId) {
 }
 function buildBackup(allData, deviceId) {
   return { _meta:{ version:APP_VERSION, exportedAt:new Date().toISOString(), exportedFrom:deviceId, appName:'Botanica Living Command Centre', schemaVersion:3 },
-    data:{ suppliers:stampRecords(allData.suppliers||[],deviceId), products:stampRecords(allData.products||[],deviceId), finance:stampRecords(allData.finance||[],deviceId), tasks:stampRecords(allData.tasks||[],deviceId), documents:stampRecords(allData.documents||[],deviceId), clients:stampRecords(allData.clients||[],deviceId), progress:allData.progress, settings:{ deviceId, exportedAt:new Date().toISOString() } } }
+    data:{ suppliers:stampRecords(allData.suppliers||[],deviceId), products:stampRecords(allData.products||[],deviceId), finance:stampRecords(allData.finance||[],deviceId), tasks:stampRecords(allData.tasks||[],deviceId), documents:stampRecords(allData.documents||[],deviceId), clients:stampRecords(allData.clients||[],deviceId), progress:allData.progress, quotes:stampRecords(allData.quotes||[],deviceId), invoices:stampRecords(allData.invoices||[],deviceId), expenses:stampRecords(allData.expenses||[],deviceId), projects:stampRecords(allData.projects||[],deviceId), settings:{ deviceId, exportedAt:new Date().toISOString() } } }
 }
 function validateBackup(parsed) {
   if (!parsed||typeof parsed!=='object') return { ok:false, reason:'Not a valid JSON object.' }
@@ -54,7 +54,7 @@ function StatusChip({ status }) {
 
 function InfoRow({ label, value, mono }) {
   return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', padding:'8px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, fontSize:13, gap:12 }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', padding:'8px 0', borderBottom:`1px solid rgba(255,255,255,0.07)`, fontSize:13, gap:12 }}>
       <span style={{ color:T.textMid, fontWeight:500, flexShrink:0 }}>{label}</span>
       <span style={{ color:T.forest, textAlign:'right', wordBreak:'break-all', fontSize:mono?11:13, fontFamily:mono?'monospace':undefined, maxWidth:260 }}>{value}</span>
     </div>
@@ -142,7 +142,7 @@ function PWAInstallSection() {
             "Tap 'Add' or 'Install' to confirm.",
             'The app icon appears on your home screen and opens full-screen.'
           ].map((s, i) => (
-            <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, fontSize:13, color:T.textMid }}>
+            <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:`1px solid rgba(255,255,255,0.07)`, fontSize:13, color:T.textMid }}>
               <span style={{ color:T.gold, fontWeight:700, flexShrink:0 }}>{i+1}.</span>
               <span>{s}</span>
             </div>
@@ -223,7 +223,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
               style={{ width:72, height:72, borderRadius:12, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.94)', padding:6, flexShrink:0, boxShadow:`0 4px 16px rgba(0,0,0,0.12)` }}
             />
             <div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.forest, lineHeight:1.2, marginBottom:3 }}>
+              <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:22, color:T.forest, lineHeight:1.2, marginBottom:3 }}>
                 Botanica Living (Pty) Ltd
               </div>
               <div style={{ fontSize:11, color:T.gold, letterSpacing:'0.14em', textTransform:'uppercase', fontWeight:600, marginBottom:5 }}>
@@ -269,7 +269,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
           <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
             <div style={{ width:40, height:40, borderRadius:10, background:T.green, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>☁</div>
             <div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.forest, lineHeight:1.2 }}>Supabase Cloud Storage</div>
+              <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:20, color:T.forest, lineHeight:1.2 }}>Supabase Cloud Storage</div>
               <div style={{ fontSize:12, color:T.green, fontWeight:700, marginTop:3 }}>✅ Connected and operational</div>
             </div>
           </div>
@@ -448,7 +448,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
               { icon:'◉',  label:'Clients',    count:allData.clients?.length||0,    unit:'organisations' },
               { icon:'▸',  label:'Progress',  count:allData.progress?.flatMap(s=>s.tasks)?.length||0, unit:'tasks' },
             ].map(r => (
-              <div key={r.label} style={{ background:'rgba(228,221,208,0.4)', borderRadius:8, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
+              <div key={r.label} style={{ background:'rgba(255,255,255,0.04)', borderRadius:8, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
                 <span style={{ fontSize:18 }}>{r.icon}</span>
                 <div>
                   <div style={{ fontWeight:600, fontSize:12, color:T.forest }}>{r.label}</div>
@@ -487,7 +487,7 @@ export default function Settings({ allData, onRestore, onLogout }) {
                 {[['Version',restorePreview.version],['Date',restorePreview.date],['Device',restorePreview.device],['Suppliers',restorePreview.counts.suppliers+' records'],['Products',restorePreview.counts.products+' records'],['Finance',restorePreview.counts.finance+' transactions'],['Tasks',restorePreview.counts.tasks+' tasks'],['Documents',restorePreview.counts.documents+' records']].map(([k,v])=>(
                   <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:`1px solid rgba(14,116,144,0.12)`, fontSize:13 }}>
                     <span style={{ color:T.textMid, fontWeight:500 }}>{k}</span>
-                    <span style={{ color:T.teal, fontFamily:"'Cormorant Garamond',serif", fontSize:15 }}>{v}</span>
+                    <span style={{ color:T.teal, fontFamily:"'Manrope',sans-serif", fontSize:15 }}>{v}</span>
                   </div>
                 ))}
               </div>

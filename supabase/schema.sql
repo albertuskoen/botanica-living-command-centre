@@ -178,3 +178,124 @@ SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public'
   AND table_name IN ('documents','transactions','document_extractions')
 ORDER BY table_name;
+
+-- ============================================================
+-- SCHEMA v2.4 ADDITIONS — Financial Hub
+-- Run after v1.7 schema is in place
+-- ============================================================
+
+-- ── QUOTES ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quotes (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  number           TEXT,
+  date             DATE NOT NULL DEFAULT CURRENT_DATE,
+  client           TEXT NOT NULL,
+  contact_person   TEXT,
+  project_name     TEXT,
+  notes            TEXT,
+  currency         TEXT DEFAULT 'ZAR',
+  exchange_rate    NUMERIC(10,4) DEFAULT 18.60,
+  status           TEXT NOT NULL DEFAULT 'Draft'
+                     CHECK (status IN ('Draft','Sent','Accepted','Rejected','Expired')),
+  discount         NUMERIC(14,2) DEFAULT 0,
+  items            JSONB,
+  total            NUMERIC(14,2) DEFAULT 0,
+  source_quote_id  UUID REFERENCES quotes(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── INVOICES ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS invoices (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  number           TEXT,
+  date             DATE NOT NULL DEFAULT CURRENT_DATE,
+  due_date         DATE,
+  client           TEXT NOT NULL,
+  contact_person   TEXT,
+  project_name     TEXT,
+  notes            TEXT,
+  status           TEXT NOT NULL DEFAULT 'Draft'
+                     CHECK (status IN ('Draft','Sent','Partially Paid','Paid','Overdue')),
+  discount         NUMERIC(14,2) DEFAULT 0,
+  items            JSONB,
+  total            NUMERIC(14,2) DEFAULT 0,
+  amount_paid      NUMERIC(14,2) DEFAULT 0,
+  payment_date     DATE,
+  payment_notes    TEXT,
+  source_quote_id  UUID REFERENCES quotes(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── EXPENSES ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS expenses (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  date             DATE NOT NULL DEFAULT CURRENT_DATE,
+  supplier         TEXT,
+  category         TEXT NOT NULL DEFAULT 'Other',
+  project_id       UUID,
+  project_name     TEXT,
+  description      TEXT NOT NULL,
+  amount           NUMERIC(14,2) NOT NULL CHECK (amount >= 0),
+  vat              NUMERIC(14,2) DEFAULT 0,
+  payment_method   TEXT DEFAULT 'EFT',
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── PROJECTS ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS projects (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name             TEXT NOT NULL,
+  client           TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'Planning'
+                     CHECK (status IN ('Planning','Active','On Hold','Completed','Cancelled')),
+  start_date       DATE DEFAULT CURRENT_DATE,
+  end_date         DATE,
+  description      TEXT,
+  revenue          NUMERIC(14,2) DEFAULT 0,
+  costs            JSONB,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_quotes_date    ON quotes(date DESC);
+CREATE INDEX IF NOT EXISTS idx_quotes_client  ON quotes(client);
+CREATE INDEX IF NOT EXISTS idx_quotes_status  ON quotes(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_date  ON invoices(date DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_due   ON invoices(due_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_expenses_date  ON expenses(date DESC);
+CREATE INDEX IF NOT EXISTS idx_expenses_cat   ON expenses(category);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+
+-- Triggers
+DROP TRIGGER IF EXISTS trg_quotes_updated    ON quotes;
+DROP TRIGGER IF EXISTS trg_invoices_updated  ON invoices;
+DROP TRIGGER IF EXISTS trg_expenses_updated  ON expenses;
+DROP TRIGGER IF EXISTS trg_projects_updated  ON projects;
+
+CREATE TRIGGER trg_quotes_updated    BEFORE UPDATE ON quotes    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_invoices_updated  BEFORE UPDATE ON invoices  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_expenses_updated  BEFORE UPDATE ON expenses  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_projects_updated  BEFORE UPDATE ON projects  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- RLS
+ALTER TABLE quotes    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_all_quotes"    ON quotes;
+DROP POLICY IF EXISTS "anon_all_invoices"  ON invoices;
+DROP POLICY IF EXISTS "anon_all_expenses"  ON expenses;
+DROP POLICY IF EXISTS "anon_all_projects"  ON projects;
+
+CREATE POLICY "anon_all_quotes"    ON quotes    FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_invoices"  ON invoices  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_expenses"  ON expenses  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_projects"  ON projects  FOR ALL USING (true) WITH CHECK (true);

@@ -50,7 +50,7 @@ function CSVPreview({ text }) {
 // ── Storage status banner ──────────────────────────────────────────────────────
 function StorageBanner({ storage }) {
   if (SUPABASE_CONFIGURED) return (
-    <div style={{ display:'flex', gap:12, alignItems:'center', padding:'11px 16px', background:T.greenPale, border:`1px solid rgba(21,128,61,0.2)`, borderRadius:10, marginBottom:18, fontSize:12 }}>
+    <div style={{ display:'flex', gap:12, alignItems:'center', padding:'11px 16px', background:'rgba(110,232,160,0.10)', border:`1px solid rgba(21,128,61,0.2)`, borderRadius:10, marginBottom:18, fontSize:12 }}>
       <span style={{ width:8,height:8,borderRadius:'50%',background:T.green,flexShrink:0,boxShadow:`0 0 6px ${T.green}` }}/>
       <div>
         <strong style={{color:T.green}}>☁ Supabase Storage connected.</strong>
@@ -327,7 +327,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
           onClick={openNew}
         >
           <div style={{fontSize:34,opacity:0.36,marginBottom:10}}>⬆</div>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:T.forest,marginBottom:5}}>
+          <div style={{fontFamily:"'Manrope',sans-serif",fontSize:20,color:T.forest,marginBottom:5}}>
             {dragOver ? 'Drop to upload document' : 'Drag & drop to upload, or click to add'}
           </div>
           <div style={{fontSize:12,color:T.textLight}}>
@@ -340,7 +340,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
         <div className="sec-label">Categories</div>
         <div className="grid-4" style={{marginBottom:22,gap:12}}>
           <div className="g-card g-card-click" style={{padding:'14px 16px',textAlign:'center',border:filterCat==='All'?`1.5px solid ${T.gold}`:undefined}} onClick={()=>setFilterCat('All')}>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:28,color:T.forest,marginBottom:3}}>{safe.length}</div>
+            <div style={{fontFamily:"'Manrope',sans-serif",fontSize:28,color:T.forest,marginBottom:3}}>{safe.length}</div>
             <div style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:T.textLight,fontWeight:600}}>All Documents</div>
           </div>
           {CATEGORIES.filter(c=>safe.some(d=>d.category===c)).map(cat => {
@@ -361,7 +361,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
           {safe.length===0 && (
             <div style={{gridColumn:'1/-1'}}>
               <div className="empty-st"><div className="empty-ic">📁</div>
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.forest,marginBottom:6}}>No documents yet</div>
+                <div style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:T.forest,marginBottom:6}}>No documents yet</div>
                 <div style={{fontSize:13,color:T.textMid}}>Add CIPC certificates, SARS registration, bank statements, supplier quotes or invoices.</div>
               </div>
             </div>
@@ -436,10 +436,10 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
               {/* Detail panel */}
               {selectedDoc && (
                 <div className="g-card" style={{position:'sticky',top:80}}>
-                  <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,paddingBottom:14,borderBottom:`1px solid rgba(210,200,184,0.4)`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,paddingBottom:14,borderBottom:`1px solid rgba(255,255,255,0.07)`}}>
                     <div className="doc-icon" style={{width:46,height:46}}>{DOC_ICONS[selectedDoc.category]||'📄'}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:T.forest,lineHeight:1.2,overflowWrap:'break-word'}}>{selectedDoc.name}</div>
+                      <div style={{fontFamily:"'Manrope',sans-serif",fontSize:17,color:T.forest,lineHeight:1.2,overflowWrap:'break-word'}}>{selectedDoc.name}</div>
                       <div style={{fontSize:10,color:T.gold,letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,marginTop:3}}>{selectedDoc.category}</div>
                     </div>
                     <button className="btn btn-ghost btn-xs" onClick={()=>setSelected(null)}>✕</button>
@@ -453,13 +453,13 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
                     ['Type',        selectedDoc.fileType?.toUpperCase()||'—'],
                     ['Storage',     selectedDoc.storageBackend==='supabase' ? '☁ Supabase Cloud' : selectedDoc.hasFile ? '💻 IndexedDB' : '— No file'],
                   ].map(([k,v])=>(
-                    <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid rgba(210,200,184,0.3)`,fontSize:13,gap:8}}>
+                    <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`,fontSize:13,gap:8}}>
                       <span style={{color:T.textMid,fontWeight:500,flexShrink:0}}>{k}</span>
-                      <span style={{color:T.forest,fontFamily:"'Cormorant Garamond',serif",fontSize:14,textAlign:'right',overflowWrap:'break-word',maxWidth:180}}>{v}</span>
+                      <span style={{color:T.forest,fontFamily:"'Manrope',sans-serif",fontSize:14,textAlign:'right',overflowWrap:'break-word',maxWidth:180}}>{v}</span>
                     </div>
                   ))}
 
-                  {selectedDoc.notes && <div style={{marginTop:12,padding:12,background:'rgba(228,221,208,0.4)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.6,overflowWrap:'break-word'}}>{selectedDoc.notes}</div>}
+                  {selectedDoc.notes && <div style={{marginTop:12,padding:12,background:'rgba(255,255,255,0.04)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.6,overflowWrap:'break-word'}}>{selectedDoc.notes}</div>}
 
                   {/* Link to transaction */}
                   <div style={{marginTop:14}}>
@@ -480,7 +480,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
                       <div style={{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:T.teal,fontWeight:700,marginBottom:5}}>🔗 Linked Transaction</div>
                       <div style={{fontSize:12,color:T.text,fontWeight:500,overflowWrap:'break-word'}}>{linkedTxn.description}</div>
                       <div style={{fontSize:11,color:T.textMid,marginTop:2}}>{fmtDate(linkedTxn.date)} · {linkedTxn.category}</div>
-                      <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.teal,marginTop:4}}>{ZAR(linkedTxn.amount)}</div>
+                      <div style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:T.teal,marginTop:4}}>{ZAR(linkedTxn.amount)}</div>
                     </div>
                   )}
 
@@ -521,7 +521,7 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
 
         {/* File picker */}
         <div
-          style={{border:`2px dashed rgba(210,200,184,0.7)`,borderRadius:12,padding:20,textAlign:'center',marginBottom:18,cursor:uploading?'not-allowed':'pointer',background:pendingFile?'rgba(21,128,61,0.05)':'rgba(255,255,255,0.3)',opacity:uploading?0.7:1}}
+          style={{border:`2px dashed rgba(255,255,255,0.07)`,borderRadius:12,padding:20,textAlign:'center',marginBottom:18,cursor:uploading?'not-allowed':'pointer',background:pendingFile?'rgba(21,128,61,0.05)':'rgba(255,255,255,0.3)',opacity:uploading?0.7:1}}
           onClick={()=>!uploading&&fileRef.current?.click()}
           onDragOver={e=>e.preventDefault()}
           onDrop={e=>{e.preventDefault();if(!uploading)handleFilePick(e.dataTransfer.files[0])}}
@@ -583,8 +583,8 @@ export default function BusinessDocuments({ documents, setDocuments, finance = [
             style={{maxHeight:'96vh',display:'flex',flexDirection:'column',padding:0,width:'min(96vw,1100px)'}}
             onClick={e=>e.stopPropagation()}
           >
-            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(210,200,184,0.5)`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,color:T.forest,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(255,255,255,0.07)`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+              <div style={{fontFamily:"'Manrope',sans-serif",fontSize:19,color:T.forest,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {previewDoc.name}
               </div>
               <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>

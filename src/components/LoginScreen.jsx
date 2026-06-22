@@ -16,12 +16,12 @@ import {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
-  logo:  { fontFamily:"'Cormorant Garamond',serif", fontSize:28, fontWeight:600, color:'#E8C07A', letterSpacing:'0.04em' },
+  logo:  { fontFamily:"'Manrope',sans-serif", fontSize:26, fontWeight:600, color:'#E8C07A', letterSpacing:'0.04em' },
   sub:   { fontSize:11, color:'rgba(232,192,122,0.55)', letterSpacing:'0.18em', textTransform:'uppercase', marginTop:4 },
-  card:  { background:'rgba(255,255,255,0.06)', border:'1px solid rgba(232,192,122,0.15)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:400, boxSizing:'border-box' },
+  card:  { background:'rgba(15,26,20,0.75)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:400, boxSizing:'border-box' },
   label: { color:'rgba(232,192,122,0.7)', fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', display:'block', marginBottom:4, marginTop:18 },
-  input: { width:'100%', boxSizing:'border-box', padding:'13px 14px', borderRadius:10, border:'1px solid rgba(232,192,122,0.3)', background:'rgba(255,255,255,0.07)', color:'#E8C07A', fontSize:16, outline:'none', marginTop:2, fontFamily:"'Inter',sans-serif", WebkitAppearance:'none' },
-  btn:   { width:'100%', padding:'14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#B8975A,#CFA96E)', color:'#0F2318', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:14, letterSpacing:'0.04em' },
+  input: { width:'100%', boxSizing:'border-box', padding:'13px 14px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(11,20,16,0.70)', color:'#E8C07A', fontSize:16, outline:'none', marginTop:2, fontFamily:"'Inter',sans-serif", WebkitAppearance:'none' },
+  btn:   { width:'100%', padding:'14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,rgba(46,74,52,0.9),rgba(31,43,33,0.95))', color:'#0F1A14', fontSize:14, fontWeight:700, cursor:'pointer', marginTop:14, letterSpacing:'0.04em' },
   ghost: { background:'none', border:'none', color:'rgba(232,192,122,0.55)', fontSize:12, cursor:'pointer', padding:'6px 0', textDecoration:'underline' },
   err:   { color:'#F87171', fontSize:12, marginTop:10, textAlign:'center', lineHeight:1.5 },
   ok:    { color:'#86EFAC', fontSize:12, marginTop:10, textAlign:'center' },
@@ -30,12 +30,12 @@ const S = {
 // ── Shared wrapper ─────────────────────────────────────────────────────────────
 function Wrap({ children }) {
   return (
-    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0F2318 0%,#1A3828 60%,#102820 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:`linear-gradient(145deg,#0B1410 0%,#0F1A14 50%,#080E0A 100%)`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 16px', fontFamily:"'Inter',sans-serif" }}>
       <div style={{ textAlign:'center', marginBottom:28 }}>
         <img
           src="/botanica-logo.png"
           alt="Botanica Living"
-          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(245,240,232,0.92)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
+          style={{ width:90, height:90, objectFit:'contain', objectPosition:'center', background:'rgba(15,26,20,0.80)', borderRadius:16, padding:8, marginBottom:14, boxShadow:'0 4px 20px rgba(0,0,0,0.45)', display:'block', margin:'0 auto 14px' }}
         />
         <div style={S.logo}>Botanica Living</div>
         <div style={{ ...S.sub, marginTop:3 }}>Designed for Life. Inspired by Nature.</div>
@@ -387,7 +387,7 @@ export default function LoginScreen({ onAuthenticated }) {
 
         {/* Skip — always prominent */}
         <button
-          style={{ ...S.btn, background:'transparent', color:'#E8C07A', border:'1px solid rgba(232,192,122,0.3)', marginTop:8 }}
+          style={{ ...S.btn, background:'transparent', color:'#E8C07A', border:'1px solid rgba(255,255,255,0.12)', marginTop:8 }}
           onClick={skip2FA}
         >
           Skip 2FA — Enter App Now

@@ -117,9 +117,9 @@ function ImportCalculator({ suppliers = [], products = [] }) {
           ['Unit Landed Cost', ZAR(unitLandedZAR), true],
           ...(target > 0 ? [['Gross Margin at Target', pct(targetMark), false, targetMark >= 40 ? T.green : T.red]] : []),
         ].map(([k,v,bold,col])=>(
-          <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'9px 0', borderBottom:`1px solid rgba(210,200,184,0.3)`, fontWeight:bold?700:400 }}>
+          <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'9px 0', borderBottom:`1px solid rgba(255,255,255,0.07)`, fontWeight:bold?700:400 }}>
             <span style={{ fontSize:13, color:T.textMid }}>{k}</span>
-            <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:bold?20:16, color:col||(bold?T.gold:T.forest) }}>{v}</span>
+            <span style={{ fontFamily:"'Manrope',sans-serif", fontSize:bold?20:16, color:col||(bold?T.gold:T.forest) }}>{v}</span>
           </div>
         ))}
       </div>
@@ -172,7 +172,7 @@ function SupplierDatabase({ suppliers, setSuppliers }) {
             <div key={s.id} className="doc-card" style={{ border:selected===s.id?`1.5px solid ${T.gold}`:undefined }} onClick={()=>setSelected(selected===s.id?null:s.id)}>
               <div style={{ width:40,height:40,borderRadius:10,background:T.greenPale,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0 }}>◎</div>
               <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:17, color:T.forest, marginBottom:3 }}>{s.name}</div>
+                <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:17, color:T.forest, marginBottom:3 }}>{s.name}</div>
                 <div style={{ fontSize:12, color:T.textMid }}>{s.country} · {s.terms} · {s.contact || 'No contact set'}</div>
                 {s.email && <div style={{ fontSize:11, color:T.textLight }}>{s.email}</div>}
               </div>
@@ -187,9 +187,9 @@ function SupplierDatabase({ suppliers, setSuppliers }) {
 
         {sel && (
           <div className="g-card" style={{position:'sticky',top:80}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,paddingBottom:12,borderBottom:`1px solid rgba(210,200,184,0.4)`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,paddingBottom:12,borderBottom:`1px solid rgba(255,255,255,0.07)`}}>
               <div>
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.forest,lineHeight:1.2}}>{sel.name}</div>
+                <div style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:T.forest,lineHeight:1.2}}>{sel.name}</div>
                 <div style={{fontSize:11,color:T.gold,letterSpacing:'0.1em',textTransform:'uppercase',marginTop:3}}>{sel.country} · {sel.terms}</div>
               </div>
               <button className="btn btn-ghost btn-xs" onClick={()=>setSelected(null)}>✕</button>
@@ -206,12 +206,12 @@ function SupplierDatabase({ suppliers, setSuppliers }) {
               ['Catalog Version', sel.catalogVersion||'—'],
               ['Status',  sel.status],
             ].map(([k,v])=>(
-              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid rgba(210,200,184,0.25)`,fontSize:12,gap:8}}>
+              <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`,fontSize:12,gap:8}}>
                 <span style={{color:T.textMid,fontWeight:500,flexShrink:0}}>{k}</span>
                 <span style={{color:T.forest,textAlign:'right',wordBreak:'break-all',fontSize:13}}>{v}</span>
               </div>
             ))}
-            {sel.notes && <div style={{marginTop:10,padding:10,background:'rgba(228,221,208,0.4)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.6}}>{sel.notes}</div>}
+            {sel.notes && <div style={{marginTop:10,padding:10,background:'rgba(255,255,255,0.04)',borderRadius:8,fontSize:12,color:T.textMid,lineHeight:1.6}}>{sel.notes}</div>}
             <button className="btn btn-primary btn-sm" style={{marginTop:14,width:'100%'}} onClick={()=>openEdit(sel)}>Edit Supplier</button>
           </div>
         )}
@@ -309,7 +309,7 @@ function SupplierCatalogs({ suppliers }) {
       {visible.length===0 ? (
         <div className="empty-st">
           <div className="empty-ic">📋</div>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.forest,marginBottom:6}}>No catalogs yet</div>
+          <div style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:T.forest,marginBottom:6}}>No catalogs yet</div>
           <div style={{fontSize:13,color:T.textMid}}>Select a supplier above and upload their PDF or Excel catalog.</div>
         </div>
       ) : (
@@ -358,7 +358,7 @@ export default function SupplierZone({ suppliers, setSuppliers, products }) {
       </div>
 
       {/* KPI bar */}
-      <div style={{ background:'rgba(255,255,255,0.55)', backdropFilter:'blur(16px)', borderBottom:`1px solid rgba(210,200,184,0.5)`, padding:'14px 36px' }}>
+      <div style={{ background:'rgba(15,26,20,0.70)', backdropFilter:'blur(16px)', borderBottom:`1px solid rgba(255,255,255,0.07)`, padding:'14px 36px' }}>
         <div className="grid-4">
           {[
             { label:'Active Suppliers',   val:activeCount,  color:T.green },
@@ -368,7 +368,7 @@ export default function SupplierZone({ suppliers, setSuppliers, products }) {
           ].map(k=>(
             <div key={k.label} className="stat-card">
               <div className="stat-label">{k.label}</div>
-              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:24, color:k.color, lineHeight:1, marginTop:4 }}>{k.val}</div>
+              <div style={{ fontFamily:"'Manrope',sans-serif", fontSize:24, color:k.color, lineHeight:1, marginTop:4 }}>{k.val}</div>
             </div>
           ))}
         </div>

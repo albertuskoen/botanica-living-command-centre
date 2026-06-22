@@ -592,7 +592,7 @@ export default function FinanceCentre({ finance, setFinance }) {
       </div>
 
       {/* KPI bar */}
-      <div style={{background:'rgba(255,255,255,0.55)',backdropFilter:'blur(16px)',borderBottom:`1px solid rgba(210,200,184,0.5)`,padding:'16px 36px'}}>
+      <div style={{background:'rgba(15,26,20,0.70)',backdropFilter:'blur(16px)',borderBottom:`1px solid rgba(255,255,255,0.07)`,padding:'16px 36px'}}>
         <div className="grid-5">
           {[
             { label:'Owner Investment', val:ZAR(invested),  color:T.teal },
@@ -603,7 +603,7 @@ export default function FinanceCentre({ finance, setFinance }) {
           ].map((k,i) => (
             <div key={i} className="stat-card">
               <div className="stat-label">{k.label}</div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:k.color,lineHeight:1,marginTop:6}}>{k.val}</div>
+              <div style={{fontFamily:"'Manrope',sans-serif",fontSize:22,color:k.color,lineHeight:1,marginTop:6}}>{k.val}</div>
             </div>
           ))}
         </div>
@@ -646,9 +646,9 @@ export default function FinanceCentre({ finance, setFinance }) {
                 { label:'Cash Position',    val:ZAR(remaining), color:remaining>=0?T.gold:T.danger },
                 { label:'Net Position',     val:ZAR(net),       color:net>=0?T.forestLight:T.danger },
               ].map(r=>(
-                <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid rgba(210,200,184,0.35)`}}>
+                <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:`1px solid rgba(255,255,255,0.07)`}}>
                   <span style={{fontSize:13,color:T.textMid}}>{r.label}</span>
-                  <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:r.color}}>{r.val}</span>
+                  <span style={{fontFamily:"'Manrope',sans-serif",fontSize:18,color:r.color}}>{r.val}</span>
                 </div>
               ))}
             </div>
@@ -688,7 +688,7 @@ export default function FinanceCentre({ finance, setFinance }) {
                           <td className="td-wrap" style={{fontSize:13,maxWidth:200}}>{t.description}</td>
                           <td style={{fontSize:12,color:T.textLight}}>{t.supplierPayee}</td>
                           <td style={{fontSize:11,color:T.textLight,fontFamily:'monospace'}}>{t.invoiceNumber||'—'}</td>
-                          <td style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,color:TYPE_COLORS[t.type],whiteSpace:'nowrap'}}>{ZAR(t.amount)}</td>
+                          <td style={{fontFamily:"'Manrope',sans-serif",fontSize:16,color:TYPE_COLORS[t.type],whiteSpace:'nowrap'}}>{ZAR(t.amount)}</td>
                           <td><SourceBadge source={t.source}/></td>
                           <td>
                             <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
@@ -838,13 +838,13 @@ export default function FinanceCentre({ finance, setFinance }) {
               )}
             </div>
             <div
-              style={{border:`2px dashed rgba(210,200,184,0.7)`,borderRadius:14,padding:'44px 24px',textAlign:'center',cursor:'pointer'}}
+              style={{border:`2px dashed rgba(255,255,255,0.07)`,borderRadius:14,padding:'44px 24px',textAlign:'center',cursor:'pointer'}}
               onClick={()=>fileRef.current?.click()}
               onDragOver={e=>e.preventDefault()}
               onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);fileRef.current.files=dt.files;handleFileSelected({target:fileRef.current})}}}
             >
               <div style={{fontSize:36,opacity:0.32,marginBottom:12}}>📄</div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:T.forest,marginBottom:6}}>Drop a file or click to browse</div>
+              <div style={{fontFamily:"'Manrope',sans-serif",fontSize:20,color:T.forest,marginBottom:6}}>Drop a file or click to browse</div>
               <div style={{fontSize:12,color:T.textLight}}>PDF · Image (JPG/PNG/WEBP) · CSV</div>
               <button className="btn btn-primary" style={{marginTop:16}} onClick={e=>{e.stopPropagation();fileRef.current?.click()}}>Choose File</button>
             </div>
@@ -854,7 +854,7 @@ export default function FinanceCentre({ finance, setFinance }) {
         {importStep==='processing' && (
           <div style={{textAlign:'center',padding:'48px 20px'}}>
             <div style={{fontSize:44,marginBottom:14}}>⏳</div>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:T.forest,marginBottom:12}}>{processMsg||'Processing…'}</div>
+            <div style={{fontFamily:"'Manrope',sans-serif",fontSize:22,color:T.forest,marginBottom:12}}>{processMsg||'Processing…'}</div>
             <div style={{maxWidth:300,margin:'0 auto'}}>
               <div className="pbar" style={{height:6}}>
                 <div className="pbar-fill pbar-gold" style={{width:`${processPct}%`,transition:'width 0.3s'}}/>
@@ -889,7 +889,7 @@ export default function FinanceCentre({ finance, setFinance }) {
           <div
             style={{
               width:'min(98vw,1180px)', height:'min(96vh,860px)',
-              background:'rgba(247,243,237,0.97)',
+              background:'rgba(15,26,20,0.97)',
               backdropFilter:'blur(40px) saturate(200%)',
               WebkitBackdropFilter:'blur(40px) saturate(200%)',
               border:'1px solid rgba(255,255,255,0.55)',
@@ -900,8 +900,8 @@ export default function FinanceCentre({ finance, setFinance }) {
             onClick={e=>e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(210,200,184,0.5)`,display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:T.forest,flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(255,255,255,0.07)`,display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+              <div style={{fontFamily:"'Manrope',sans-serif",fontSize:20,color:T.forest,flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 Review: {reviewInfo.fileName}
               </div>
               <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
@@ -923,7 +923,7 @@ export default function FinanceCentre({ finance, setFinance }) {
               background: reviewInfo.ocrMethod==='ai'||reviewInfo.ocrMethod==='tesseract'
                 ? T.greenPale : reviewInfo.ocrMethod==='pdfjs'
                 ? 'rgba(14,116,144,0.06)' : 'rgba(228,221,208,0.5)',
-              borderBottom:`1px solid rgba(210,200,184,0.4)`,
+              borderBottom:`1px solid rgba(255,255,255,0.07)`,
               color: reviewInfo.ocrMethod==='none' ? T.textMid : T.green,
             }}>
               {reviewInfo.ocrMethod==='ai'        && '✅ AI extracted data. Review all fields before saving.'}
@@ -936,7 +936,7 @@ export default function FinanceCentre({ finance, setFinance }) {
             <div style={{flex:1,display:'flex',overflow:'hidden',minHeight:0}}>
 
               {/* LEFT — shared DocPreview component (same as BusinessDocuments) */}
-              <div style={{flex:'0 0 55%',overflow:'auto',padding:16,borderRight:`1px solid rgba(210,200,184,0.4)`}}>
+              <div style={{flex:'0 0 55%',overflow:'auto',padding:16,borderRight:`1px solid rgba(255,255,255,0.07)`}}>
                 <div style={{fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:T.gold,fontWeight:700,marginBottom:12}}>
                   Document Preview
                 </div>
@@ -1020,7 +1020,7 @@ export default function FinanceCentre({ finance, setFinance }) {
             </div>
 
             {/* Footer */}
-            <div style={{padding:'14px 22px',borderTop:`1px solid rgba(210,200,184,0.5)`,display:'flex',gap:10,justifyContent:'flex-end',flexShrink:0,flexWrap:'wrap'}}>
+            <div style={{padding:'14px 22px',borderTop:`1px solid rgba(255,255,255,0.07)`,display:'flex',gap:10,justifyContent:'flex-end',flexShrink:0,flexWrap:'wrap'}}>
               <button className="btn btn-outline" onClick={cleanupReview}>Reject — Don't Save</button>
               <button className="btn btn-primary" onClick={approveReview}>✓ Approve & Save Transaction</button>
             </div>
@@ -1037,9 +1037,9 @@ export default function FinanceCentre({ finance, setFinance }) {
             onClick={e=>e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(210,200,184,0.5)`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+            <div style={{padding:'16px 22px',borderBottom:`1px solid rgba(255,255,255,0.07)`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:19,color:T.forest,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                <div style={{fontFamily:"'Manrope',sans-serif",fontSize:19,color:T.forest,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                   {docPreviewTxn.sourceFile || 'Source Document'}
                 </div>
                 <div style={{fontSize:11,color:T.textMid,marginTop:2}}>

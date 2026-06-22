@@ -1,4 +1,4 @@
-// ── SEED DATA ─────────────────────────────────────────────────────────────────
+// ── SEED DATA v2.4 ────────────────────────────────────────────────────────────
 
 export const INIT_SUPPLIERS = [
   { id:1, name:'Frank / Dongyi', contact:'Frank Chen', country:'China', email:'frank@dongyi.cn', whatsapp:'+86 138 0000 1234', terms:'FOB', notes:'Primary supplier. Fast samples. Excellent quality on Olive & Ficus range.', status:'Active' },
@@ -32,7 +32,7 @@ export const INIT_PROGRESS = [
     { id:'bd3', name:'Email active: aldo@botanicaliving.co.za', status:'Completed', priority:'High', dueDate:'', notes:'' },
     { id:'bd4', name:'Website concept in progress', status:'In Progress', priority:'Medium', dueDate:'', notes:'Landing page to follow Founders Collection launch.' },
     { id:'bd5', name:'Email signature created', status:'Completed', priority:'Low', dueDate:'', notes:'' },
-    { id:'bd6', name:'Command Centre live', status:'Completed', priority:'High', dueDate:'', notes:'v1.2 deployed.' },
+    { id:'bd6', name:'Command Centre live', status:'Completed', priority:'High', dueDate:'', notes:'v2.4 deployed.' },
   ]},
   { section:'Supplier Development', icon:'❧', tasks:[
     { id:'sd1', name:'Frank / Dongyi relationship active', status:'Completed', priority:'Critical', dueDate:'', notes:'Primary supplier confirmed.' },
@@ -80,6 +80,13 @@ export const INIT_TASKS = [
 
 export const INIT_DOCUMENTS = []
 
+// ── FINANCIAL HUB INIT DATA ───────────────────────────────────────────────────
+
+export const INIT_QUOTES = []
+export const INIT_INVOICES = []
+export const INIT_EXPENSES = []
+export const INIT_PROJECTS = []
+
 export const MILESTONES_COMPLETED = [
   { label:'Company Registered', date:'2026' },
   { label:'SARS Registered', date:'2026' },
@@ -98,27 +105,31 @@ export const MILESTONES_UPCOMING = [
   { label:'First Container', status:'Not Started' },
 ]
 
+// ── Navigation v2.4 ───────────────────────────────────────────────────────────
 export const NAV = [
-  // Core — daily operations
-  { id:'dashboard',  icon:'◈', label:'Dashboard',            group:'Core' },
-  { id:'progress',   icon:'▸', label:'Business Progress',    group:'Core' },
-  { id:'finance',    icon:'₩', label:'Finance Centre',       group:'Core' },
-  { id:'actions',    icon:'✓', label:'Action Centre',        group:'Core' },
-  { id:'documents',  icon:'◻', label:'Business Documents',   group:'Core' },
-  // Supplier Zone — all supplier, product, pricing and import activity
-  { id:'supplierzone', icon:'◎', label:'Supplier Zone',      group:'Supplier Zone' },
-  { id:'products',     icon:'❧', label:'Product Database',   group:'Supplier Zone' },
-  // Market — client and channel management
-  { id:'clients',    icon:'◉', label:'Client Database',      group:'Market' },
-  { id:'founders',   icon:'✦', label:'Founders Collection',  group:'Market' },
-  // Strategy — long-term planning and opportunities
-  { id:'strategy',   icon:'⊟', label:'Strategy',             group:'Strategy' },
-  // System
-  { id:'settings',   icon:'⚙', label:'Settings',             group:'System' },
+  { id:'dashboard',    icon:'⬡', label:'Dashboard',          group:'Overview' },
+  // Supplier Zone
+  { id:'supplierzone', icon:'◎', label:'Supplier Zone',       group:'Supply Chain' },
+  { id:'products',     icon:'❧', label:'Product Database',    group:'Supply Chain' },
+  // Client
+  { id:'clients',      icon:'◉', label:'Client Database',     group:'Market' },
+  { id:'founders',     icon:'✦', label:'Founders Collection', group:'Market' },
+  // Financial Hub
+  { id:'finance-hub',  icon:'◈', label:'Financial Hub',       group:'Finance' },
+  { id:'quotes',       icon:'◻', label:'Quotes',              group:'Finance' },
+  { id:'invoices',     icon:'▣', label:'Invoices',            group:'Finance' },
+  { id:'expenses',     icon:'⊟', label:'Expenses',            group:'Finance' },
+  // Projects
+  { id:'projects',     icon:'⊞', label:'Projects',            group:'Operations' },
+  { id:'progress',     icon:'▸', label:'Business Progress',   group:'Operations' },
+  { id:'actions',      icon:'✓', label:'Action Centre',       group:'Operations' },
+  // Other
+  { id:'documents',    icon:'▤', label:'Documents',           group:'Resources' },
+  { id:'strategy',     icon:'⊟', label:'Strategy',            group:'Resources' },
+  { id:'settings',     icon:'⚙', label:'Settings',            group:'System' },
 ]
 
 // ── CLIENT DATABASE ────────────────────────────────────────────────────────────
-// Preloaded prospects. Scalable to hundreds of organisations.
 export const CLIENT_SECTORS = [
   'Healthcare', 'Education', 'Property', 'Hospitality',
   'Retail', 'Corporate', 'Government', 'Designers & Architects',
@@ -138,21 +149,16 @@ export const CLIENT_STATUSES = [
 export const CLIENT_PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
 
 export const INIT_CLIENTS = [
-  // Healthcare
   { id:101, company:'Mediclinic', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'mediclinic.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Large private hospital group — multiple facilities across SA. High volume opportunity for reception and waiting area greenery.', followUpDate:'' },
   { id:102, company:'Netcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'netcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Second largest private hospital operator in SA. National footprint.', followUpDate:'' },
   { id:103, company:'Life Healthcare', sector:'Healthcare', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'lifehealthcare.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Third major private hospital group. Strong presence in Gauteng and Western Cape.', followUpDate:'' },
-  // Education
   { id:201, company:'Curro Holdings', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'curro.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Private school group with 60+ campuses. Reception and communal areas across network.', followUpDate:'' },
   { id:202, company:'ADvTECH', sector:'Education', type:'Strategic Account', priority:'Medium', status:'Not Contacted', website:'advtech.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Owns Varsity College, Rosebank College, Crawford schools. Multiple campuses.', followUpDate:'' },
-  // Property
   { id:301, company:'Growthpoint Properties', sector:'Property', type:'Strategic Account', priority:'Critical', status:'Not Contacted', website:'growthpoint.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'Facilities Management', notes:'Largest SA REIT. Owns major office parks and retail centres. Facilities budget driven.', followUpDate:'' },
   { id:302, company:'Redefine Properties', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'redefine.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major property fund — offices and retail. Strong Gauteng presence.', followUpDate:'' },
   { id:303, company:'Attacq', sector:'Property', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'attacq.co.za', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Waterfall City developer. Premium lifestyle precinct — strong brand alignment.', followUpDate:'' },
-  // Hospitality
-  { id:401, company:'Village N Life', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'villagenlife.co.za', email:'', phone:'', hqAddress:'Cape Town', contactPerson:'', position:'', department:'', notes:'Cape-based hospitality group. Boutique hotels and resorts. Premium positioning aligns with Botanica Living brand.', followUpDate:'' },
+  { id:401, company:'Village N Life', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'villagenlife.co.za', email:'', phone:'', hqAddress:'Cape Town', contactPerson:'', position:'', department:'', notes:'Cape-based hospitality group. Boutique hotels and resorts.', followUpDate:'' },
   { id:402, company:'Southern Sun', sector:'Hospitality', type:'Strategic Account', priority:'High', status:'Not Contacted', website:'southernsun.com', email:'', phone:'', hqAddress:'', contactPerson:'', position:'', department:'', notes:'Major hotel group across SA. Large footprint — reception, lobby, restaurant greenery opportunities.', followUpDate:'' },
-  // Retail (Checkers as strategic account)
   { id:501, company:'Shoprite / Checkers Hyper', sector:'Retail', type:'Strategic Account', priority:'Critical', status:'Researching', website:'checkers.co.za', email:'', phone:'', hqAddress:'Brackenfell, Cape Town', contactPerson:'', position:'Category Buyer', department:'Non-Foods / Home', notes:'Priority anchor retail opportunity. Shop-in-shop concept for Checkers Hyper stores. Requires pitch deck, pilot proposal, buyer contact.', followUpDate:'' },
 ]
 
@@ -162,4 +168,14 @@ export const FINANCE_CATEGORIES = {
   'Business Expense': ['CIPC / Compliance','SARS / Tax','Domain & Email','Website & Digital','Supplier Samples','Freight & Courier','Customs & Clearing','Marketing','Product Development','Assembly & Packaging','Travel','Banking Fees','Other Expense'],
 }
 
+export const EXPENSE_CATEGORIES = [
+  'Samples','Freight','Clearing & Duty','Transport','Marketing',
+  'Website & Digital','Travel','Office','Salaries','Banking Fees',
+  'CIPC / Compliance','SARS / Tax','Assembly & Packaging','Other',
+]
+
 export const PAYMENT_METHODS = ['EFT','Cash','Card','PayPal','Wise','Other']
+
+export const QUOTE_STATUSES = ['Draft','Sent','Accepted','Rejected','Expired']
+export const INVOICE_STATUSES = ['Draft','Sent','Partially Paid','Paid','Overdue']
+export const PROJECT_STATUSES = ['Planning','Active','On Hold','Completed','Cancelled']
