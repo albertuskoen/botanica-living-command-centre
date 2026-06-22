@@ -45,6 +45,19 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400 })
     }
 
+    const extractionType = formData.get('extractionType') || 'invoice'
+    const supplierName   = formData.get('supplierName')   || ''
+    const customPrompt   = formData.get('prompt')         || ''
+
+    // ── Supplier catalog extraction (returns JSON array of products) ──────────
+    if (extractionType === 'supplier_catalog') {
+      const textToUse = rawText || ''
+      if (textToUse.trim().length > 20 || file) {
+        const result = await extractCatalogWithClaude(textToUse, supplierName, base64OrNull(file), secretKey)
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } })
+      }
+    }
+
     // ── If we already have text (from pdf.js), use AI to extract structured data ──
     if (rawText && rawText.trim().length > 20) {
       const result = await extractWithClaudeText(rawText, secretKey)
@@ -65,6 +78,128 @@ export default async function handler(request) {
       message: err.message,
     }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
+}
+
+// ── Helper: convert file to base64 if possible ───────────────────────────────
+async function base64OrNull(file) {
+  if (!file) return null
+  try {
+    const bytes = await file.arrayBuffer()
+    return btoa(String.fromCharCode(...new Uint8Array(bytes)))
+  } catch { return null }
+}
+
+// ── Claude catalog extraction (returns array of products) ─────────────────────
+async function extractCatalogWithClaude(rawText, supplierName, base64Data, apiKey) {
+  const messages = []
+
+  if (base64Data && rawText.length < 100) {
+    // Use vision for image/scanned catalogs
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Data } },
+        { type: 'text', text: buildCatalogExtractionPrompt(supplierName, '') },
+      ],
+    })
+  } else {
+    messages.push({
+      role: 'user',
+      content: buildCatalogExtractionPrompt(supplierName, rawText),
+    })
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-6',
+      max_tokens: 4096,
+      messages,
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error('Claude API: ' + err)
+  }
+
+  const data = await response.json()
+  const text = (data.content || []).map(b => b.text || '').join('')
+
+  // Parse JSON array from response
+  try {
+    const clean   = text.replace(/```json|```/g, '').trim()
+    const parsed  = JSON.parse(clean)
+    const products = Array.isArray(parsed) ? parsed : (parsed.products || [])
+    return { products, raw: text }
+  } catch {
+    return { products: [], raw: text, parseError: 'Could not parse product JSON from AI response' }
+  }
+}
+
+function buildCatalogExtractionPrompt(supplierName, rawText) {
+  return 'You are a product data extraction assistant for Botanica Living Group, a South African premium artificial greenery importer.
+
+' +
+    'Supplier: ' + (supplierName || 'Unknown') + '
+
+' +
+    'Extract ALL products from the catalog below. Return ONLY a valid JSON array. No explanation, no markdown, no preamble.
+
+' +
+    'Each product object must have these fields (empty string if not found):
+' +
+    '{
+' +
+    '  "productName": "",
+' +
+    '  "productCode": "",
+' +
+    '  "category": "",
+' +
+    '  "height": "",
+' +
+    '  "width": "",
+' +
+    '  "potSize": "",
+' +
+    '  "colour": "",
+' +
+    '  "material": "",
+' +
+    '  "moq": "",
+' +
+    '  "unitPrice": "",
+' +
+    '  "exwPrice": "",
+' +
+    '  "fobPrice": "",
+' +
+    '  "cifPrice": "",
+' +
+    '  "samplePrice": "",
+' +
+    '  "currency": "USD",
+' +
+    '  "leadTime": "",
+' +
+    '  "packagingNotes": "",
+' +
+    '  "notes": "",
+' +
+    '  "confidence": 85
+' +
+    '}
+
+' +
+    'CATALOG TEXT:
+' +
+    rawText.slice(0, 8000)
 }
 
 // ── Claude Vision (for images and scanned PDFs) ────────────────────────────────

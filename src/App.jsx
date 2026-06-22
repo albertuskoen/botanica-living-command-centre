@@ -123,7 +123,9 @@ export default function App() {
   const [clients,    setClients]    = useLocalStorage('bl_clients',   INIT_CLIENTS)
   const [quotes,     setQuotes]     = useLocalStorage('bl_quotes',    INIT_QUOTES)
   const [invoices,   setInvoices]   = useLocalStorage('bl_invoices',  INIT_INVOICES)
-  const [expenses,   setExpenses]   = useLocalStorage('bl_expenses',  INIT_EXPENSES)
+  const [expenses,      setExpenses]      = useLocalStorage('bl_expenses',       INIT_EXPENSES)
+  const [catalogs,      setCatalogs]      = useLocalStorage('bl_catalogs',       [])
+  const [catalogProds,  setCatalogProds]  = useLocalStorage('bl_catalog_products',[])
 
   // ── One-time seed recovery ─────────────────────────────────────────────────
   // If a key exists in localStorage but is empty [], useLocalStorage returns []
@@ -252,7 +254,7 @@ export default function App() {
             {page === 'finance'    && <FinanceCentre      finance={safeFinance}     setFinance={setFinance} />}
             {page === 'actions'    && <ActionCentre       tasks={safeTasks}         setTasks={setTasks} />}
             {page === 'documents'  && <BusinessDocuments  documents={safeDocuments} setDocuments={setDocuments} finance={safeFinance} />}
-            {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} />}
+            {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} catalogs={catalogs} setCatalogs={setCatalogs} catalogProds={catalogProds} setCatalogProds={setCatalogProds} />}
             {page === 'products'     && <Products products={safeProducts} setProducts={setProducts} suppliers={safeSuppliers} />}
             {page === 'clients'      && <ClientDatabase clients={safeClients} setClients={setClients} />}
             {page === 'financialhub' && <FinancialHub quotes={safeQuotes} setQuotes={setQuotes} invoices={safeInvoices} setInvoices={setInvoices} expenses={safeExpenses} finance={safeFinance} clients={safeClients} suppliers={safeSuppliers} documents={safeDocuments} />}
