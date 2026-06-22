@@ -4,22 +4,17 @@ const GROUPS = ['Core', 'Suppliers', 'Clients', 'Finance', 'Operations', 'Knowle
 
 const PAGE_ICONS = {
   dashboard:    { icon: '⬡', label: 'Dashboard' },
-  progress:     { icon: '◐', label: 'Business Progress' },
-  finance:      { icon: '◈', label: 'Finance Centre' },
-  actions:      { icon: '⊙', label: 'Action Centre' },
-  documents:    { icon: '▣', label: 'Business Documents' },
   supplierzone: { icon: '◎', label: 'Supplier Zone' },
   products:     { icon: '❧', label: 'Product Database' },
   clients:      { icon: '◉', label: 'Client Database' },
-  founders:     { icon: '✦', label: "Founders' Collection" },
   financialhub: { icon: '⊞', label: 'Invoicing' },
   finance:      { icon: '₩', label: 'Finance Centre' },
   progress:     { icon: '▸', label: 'Business Progress' },
   actions:      { icon: '✓', label: 'Action Centre' },
-  projects:     { icon: '▸', label: 'Projects & Tasks' },
   documents:    { icon: '◻', label: 'Documents' },
   strategy:     { icon: '⊟', label: 'Strategy' },
-  settings:     { icon: '⊛', label: 'Settings' },
+  founders:     { icon: '✦', label: "Founders' Collection" },
+  settings:     { icon: '⚙', label: 'Settings' },
 }
 
 export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, onLogout }) {

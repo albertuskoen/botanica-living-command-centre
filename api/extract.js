@@ -151,8 +151,7 @@ function buildCatalogExtractionPrompt(supplierName, rawText) {
     '"cifPrice": ""', '"samplePrice": ""', '"currency": "USD"',
     '"leadTime": ""', '"packagingNotes": ""', '"notes": ""',
     '"confidence": 85',
-  ].map(f => '  ' + f).join(',
-')
+  ].map(f => '  ' + f).join(',\n')
 
   return (
     'You are a product data extraction assistant for Botanica Living Group, ' +
