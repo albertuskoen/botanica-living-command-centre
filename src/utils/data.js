@@ -107,7 +107,8 @@ export const NAV = [
   // Client Database
   { id:'clients',      icon:'◉', label:'Client Database',   group:'Client Database' },
   // Financial Hub
-  { id:'financialhub', icon:'₩', label:'Financial Hub',     group:'Financial Hub' },
+  { id:'financialhub', icon:'₩', label:'Financial Hub',     group:'Finance' },
+  { id:'finance',      icon:'◈', label:'Finance Centre',   group:'Finance' },
   // Projects
   { id:'projects',     icon:'▸', label:'Projects & Tasks',  group:'Projects' },
   // Documents
