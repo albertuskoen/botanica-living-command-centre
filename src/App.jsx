@@ -223,7 +223,7 @@ export default function App() {
             {page === 'progress'     && <BusinessProgress progress={safeProgress} setProgress={setProgress} />}
             {page === 'actions'      && <ActionCentre tasks={safeTasks} setTasks={setTasks} />}
             {page === 'documents'    && <BusinessDocuments documents={safeDocuments} setDocuments={setDocuments} finance={safeFinance} />}
-            {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} />}
+            {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} setProducts={setProducts} />}
             {page === 'products'     && <Products products={safeProducts} setProducts={setProducts} suppliers={safeSuppliers} />}
             {page === 'clients'      && <ClientDatabase clients={safeClients} setClients={setClients} />}
             {page === 'founders'     && <FoundersCollection products={safeProducts} />}
