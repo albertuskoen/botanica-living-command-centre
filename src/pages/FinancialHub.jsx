@@ -1,4 +1,4 @@
-// FinancialHub.jsx — v1.0
+// FinancialHub.jsx  (displayed as "Invoicing") — v1.0
 // Single source of truth for all financial activity.
 // Data flows: Quotes → Invoices → AR → Cash Flow
 //             Expenses → Project Profitability
@@ -1036,8 +1036,8 @@ export default function FinancialHub({ quotes, setQuotes, invoices, setInvoices,
     <div>
       <div className="page-header">
         <div>
-          <div className="page-title">Financial Hub</div>
-          <div className="page-subtitle">Quotes · Invoices · Profitability</div>
+          <div className="page-title">Invoicing</div>
+          <div className="page-subtitle">Quotes · Invoices · Accounts Receivable · Profitability</div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { NAV } from '../utils/data.js'
 
-const GROUPS = ['Core', 'Supplier Zone', 'Client Database', 'Finance', 'Projects', 'Documents', 'Strategy', 'System']
+const GROUPS = ['Core', 'Suppliers', 'Clients', 'Finance', 'Operations', 'Knowledge', 'System']
 
 const PAGE_ICONS = {
   dashboard:    { icon: '⬡', label: 'Dashboard' },
@@ -12,8 +12,10 @@ const PAGE_ICONS = {
   products:     { icon: '❧', label: 'Product Database' },
   clients:      { icon: '◉', label: 'Client Database' },
   founders:     { icon: '✦', label: "Founders' Collection" },
-  financialhub: { icon: '₩', label: 'Financial Hub' },
-  finance:      { icon: '◈', label: 'Finance Centre' },
+  financialhub: { icon: '⊞', label: 'Invoicing' },
+  finance:      { icon: '₩', label: 'Finance Centre' },
+  progress:     { icon: '▸', label: 'Business Progress' },
+  actions:      { icon: '✓', label: 'Action Centre' },
   projects:     { icon: '▸', label: 'Projects & Tasks' },
   documents:    { icon: '◻', label: 'Documents' },
   strategy:     { icon: '⊟', label: 'Strategy' },

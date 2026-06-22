@@ -15,62 +15,58 @@ export const INIT_PRODUCTS = [
 ]
 
 export const INIT_PROGRESS = [
-  { section:'Company Registration', icon:'◎', tasks:[
-    { id:'cr1', name:'Company registered', status:'Completed', priority:'Critical', dueDate:'', notes:'Registration confirmed with CIPC.' },
-    { id:'cr2', name:'CIPC name change submitted', status:'Completed', priority:'Critical', dueDate:'', notes:'Submitted. Awaiting approval.' },
-    { id:'cr3', name:'Name change approved', status:'Completed', priority:'Critical', dueDate:'', notes:'Botanica Living Group (Pty) Ltd confirmed.' },
-    { id:'cr4', name:'Company documents updated', status:'In Progress', priority:'High', dueDate:'', notes:'Update MOI, letterhead, and bank mandate.' },
-  ]},
-  { section:'SARS & Import Compliance', icon:'⊟', tasks:[
-    { id:'sars1', name:'SARS income tax registration completed', status:'Completed', priority:'Critical', dueDate:'', notes:'' },
-    { id:'sars2', name:'Importer registration submitted', status:'In Progress', priority:'Critical', dueDate:'', notes:'Busy with SARS eFiling registration as importer.' },
-    { id:'sars3', name:'Customs code received', status:'Not Started', priority:'Critical', dueDate:'', notes:'Required before first shipment can be cleared.' },
-  ]},
-  { section:'Brand & Digital', icon:'✦', tasks:[
-    { id:'bd1', name:'Logo created', status:'Completed', priority:'High', dueDate:'', notes:'Premium botanical mark finalised.' },
-    { id:'bd2', name:'Domain registered: botanicaliving.co.za', status:'Completed', priority:'High', dueDate:'', notes:'' },
-    { id:'bd3', name:'Email active: aldo@botanicaliving.co.za', status:'Completed', priority:'High', dueDate:'', notes:'' },
-    { id:'bd4', name:'Website concept in progress', status:'In Progress', priority:'Medium', dueDate:'', notes:'Landing page to follow Founders Collection launch.' },
-    { id:'bd5', name:'Email signature created', status:'Completed', priority:'Low', dueDate:'', notes:'' },
-    { id:'bd6', name:'Command Centre live', status:'Completed', priority:'High', dueDate:'', notes:'v1.2 deployed.' },
-  ]},
-  { section:'Supplier Development', icon:'❧', tasks:[
-    { id:'sd1', name:'Frank / Dongyi relationship active', status:'Completed', priority:'Critical', dueDate:'', notes:'Primary supplier confirmed.' },
-    { id:'sd2', name:'Campion / Trustfloral relationship active', status:'Completed', priority:'High', dueDate:'', notes:'Specialist for hanging greenery and boxwood panels.' },
-    { id:'sd3', name:'Supplier video meetings scheduled', status:'In Progress', priority:'High', dueDate:'', notes:'Schedule calls to discuss MOQ flexibility.' },
-    { id:'sd4', name:'Catalogues received', status:'In Progress', priority:'Medium', dueDate:'', notes:'Catalogues from Dongyi received. Trustfloral pending.' },
-    { id:'sd5', name:'Sample quotes confirmed', status:'In Progress', priority:'High', dueDate:'', notes:'Quotes received for Olive and Ficus. Palm pending.' },
-    { id:'sd6', name:'Supplier comparison matrix completed', status:'Not Started', priority:'Medium', dueDate:'', notes:'' },
-  ]},
-  { section:'Product Development', icon:'◈', tasks:[
-    { id:'pd1', name:'Founders Collection draft completed', status:'In Progress', priority:'Critical', dueDate:'', notes:'6 hero SKUs identified.' },
-    { id:'pd2', name:'Samples ordered', status:'Not Started', priority:'Critical', dueDate:'', notes:'Waiting on customs code and bank account.' },
-    { id:'pd3', name:'Product scoring sheet completed', status:'Not Started', priority:'High', dueDate:'', notes:'' },
-    { id:'pd4', name:'Landed cost model completed', status:'In Progress', priority:'Critical', dueDate:'', notes:'Import calculator built.' },
-  ]},
-  { section:'Operations', icon:'⊞', tasks:[
-    { id:'op1', name:'Paarl assembly location identified', status:'Completed', priority:'High', dueDate:'', notes:'Concept confirmed.' },
-    { id:'op2', name:'Assembly SOP documented', status:'Not Started', priority:'High', dueDate:'', notes:'' },
-    { id:'op3', name:'QC checklist created', status:'Not Started', priority:'High', dueDate:'', notes:'' },
-    { id:'op4', name:'Storage and handling plan finalised', status:'Not Started', priority:'Medium', dueDate:'', notes:'' },
-  ]},
-  { section:'Retail Strategy', icon:'◉', tasks:[
-    { id:'rs1', name:'Checkers Hyper identified as anchor opportunity', status:'Completed', priority:'Critical', dueDate:'', notes:'' },
-    { id:'rs2', name:'Shop-in-shop concept defined', status:'Completed', priority:'High', dueDate:'', notes:'Visual merchandising concept drafted.' },
-    { id:'rs3', name:'Pitch deck created', status:'Not Started', priority:'Critical', dueDate:'', notes:'' },
-    { id:'rs4', name:'Checkers buyer contact established', status:'Not Started', priority:'Critical', dueDate:'', notes:'' },
-    { id:'rs5', name:'Pilot proposal submitted', status:'Not Started', priority:'Critical', dueDate:'', notes:'' },
-  ]},
-  { section:'Finance', icon:'◈', tasks:[
-    { id:'fi1', name:'Import cost model created', status:'Completed', priority:'Critical', dueDate:'', notes:'Full landed cost calculator built.' },
-    { id:'fi2', name:'Pricing strategy in progress', status:'In Progress', priority:'Critical', dueDate:'', notes:'Sell-in and RRP matrix being finalised.' },
-    { id:'fi3', name:'Business bank account opened', status:'Not Started', priority:'Critical', dueDate:'', notes:'Waiting on name change approval.' },
-    { id:'fi4', name:'Funding / investor strategy defined', status:'Not Started', priority:'High', dueDate:'', notes:'' },
-  ]},
+  {
+    id: 1,
+    section: 'Supplier Development',
+    tasks: [
+      { id:101, name:'Schedule Dongyi video call — MOQ flexibility discussion', priority:'High',     status:'Not Started', dueDate:'', notes:'Discuss first order quantities and lead time for Olive and Ficus range.' },
+      { id:102, name:'Request updated 2026 catalog from Frank / Dongyi',        priority:'Medium',   status:'Not Started', dueDate:'', notes:'New season pricing and new SKUs.' },
+      { id:103, name:'Sample quality validation — Olive Tree 180cm',             priority:'High',     status:'In Progress', dueDate:'', notes:'Received. Checking stems, pot, foliage density.' },
+      { id:104, name:'Sample quality validation — Ficus Tree 180cm',             priority:'High',     status:'In Progress', dueDate:'', notes:'Received. Comparing to competitor benchmarks.' },
+      { id:105, name:'Negotiate payment terms for first container',              priority:'Critical', status:'Not Started', dueDate:'', notes:'Target: 30% deposit, 70% before shipping.' },
+    ],
+  },
+  {
+    id: 2,
+    section: 'Compliance & Legal',
+    tasks: [
+      { id:201, name:'SARS eFiling — complete importer registration',            priority:'Critical', status:'In Progress', dueDate:'', notes:'Required before first shipment. ITAC registration also needed.' },
+      { id:202, name:'Open Botanica Living business bank account',               priority:'Critical', status:'Not Started', dueDate:'', notes:'FNB Business or Investec. Waiting on registration documents.' },
+      { id:203, name:'Register for VAT',                                         priority:'High',     status:'Not Started', dueDate:'', notes:'Required once turnover threshold is reached or proactively.' },
+      { id:204, name:'Confirm customs tariff code for artificial greenery',      priority:'High',     status:'Not Started', dueDate:'', notes:'HS code determines import duty rate. Get ruling from SARS.' },
+    ],
+  },
+  {
+    id: 3,
+    section: 'Retail Channel — Checkers Hyper',
+    tasks: [
+      { id:301, name:'Build Checkers Hyper pitch deck',                          priority:'Critical', status:'Not Started', dueDate:'', notes:'Financial model + visual concept + pilot store proposal.' },
+      { id:302, name:'Financial model for Checkers pilot (unit economics)',      priority:'Critical', status:'Not Started', dueDate:'', notes:'Cost per unit, retail price, margin, sell-through rate, reorder model.' },
+      { id:303, name:'Identify Non-Foods category buyer contact at Shoprite HQ', priority:'High',     status:'Not Started', dueDate:'', notes:'Brackenfell HQ. May need LinkedIn outreach or industry contact.' },
+      { id:304, name:'Prepare product selection for Checkers range',             priority:'High',     status:'Not Started', dueDate:'', notes:'Curate 6-10 SKUs appropriate for mass retail. Simplified packaging.' },
+    ],
+  },
+  {
+    id: 4,
+    section: 'Commercial Client Outreach',
+    tasks: [
+      { id:401, name:'Research Growthpoint facilities management contact',       priority:'High',     status:'Not Started', dueDate:'', notes:'Target: Property Management or Facilities department.' },
+      { id:402, name:'Prepare commercial B2B pricing proposal',                  priority:'High',     status:'Not Started', dueDate:'', notes:'Volume pricing tiers, annual replacement pricing, installation options.' },
+      { id:403, name:'Create healthcare-specific product selection',              priority:'Medium',   status:'Not Started', dueDate:'', notes:'Infection-control appropriate. No soil, no water, no pollen.' },
+      { id:404, name:'Reach out to Village N Life — hospitality greenery brief', priority:'Medium',   status:'Not Started', dueDate:'', notes:'Premium boutique hotel group. Strong brand alignment.' },
+    ],
+  },
+  {
+    id: 5,
+    section: 'Platform Development',
+    tasks: [
+      { id:501, name:'Client Database — populate contact details for all 13 accounts', priority:'High',   status:'Completed', dueDate:'', notes:'V1 dataset loaded. Phone, email, HQ address for all strategic accounts.' },
+      { id:502, name:'Finance Centre — enter all startup expenses',              priority:'Critical', status:'In Progress', dueDate:'', notes:'All business costs since registration must be captured for tax purposes.' },
+      { id:503, name:'Invoicing module — create first quote template',           priority:'Medium',   status:'Not Started', dueDate:'', notes:'Standard Botanica Living quote format with payment terms.' },
+      { id:504, name:'Supplier Zone — add Frank Dongyi full profile',            priority:'Medium',   status:'Not Started', dueDate:'', notes:'Full contact details, payment terms, lead times.' },
+    ],
+  },
 ]
-
-export const INIT_FINANCE = []
-
 export const INIT_TASKS = [
   { id:1, name:'Schedule Dongyi video call', priority:'High', status:'Not Started', dueDate:'', notes:'Discuss MOQ flexibility on first order.', category:'Suppliers' },
   { id:2, name:'Complete importer registration on SARS eFiling', priority:'Critical', status:'In Progress', dueDate:'', notes:'Required before first shipment.', category:'Compliance' },
@@ -101,20 +97,20 @@ export const MILESTONES_UPCOMING = [
 export const NAV = [
   // Core
   { id:'dashboard',    icon:'⬡', label:'Dashboard',         group:'Core' },
-  // Supplier Zone
-  { id:'supplierzone', icon:'◎', label:'Supplier Zone',     group:'Supplier Zone' },
-  { id:'products',     icon:'❧', label:'Product Database',  group:'Supplier Zone' },
-  // Client Database
-  { id:'clients',      icon:'◉', label:'Client Database',   group:'Client Database' },
-  // Financial Hub
-  { id:'financialhub', icon:'₩', label:'Financial Hub',     group:'Finance' },
-  { id:'finance',      icon:'◈', label:'Finance Centre',   group:'Finance' },
-  // Projects
-  { id:'projects',     icon:'▸', label:'Projects & Tasks',  group:'Projects' },
-  // Documents
-  { id:'documents',    icon:'◻', label:'Documents',         group:'Documents' },
-  // Strategy
-  { id:'strategy',     icon:'⊟', label:'Strategy',          group:'Strategy' },
+  // Suppliers
+  { id:'supplierzone', icon:'◎', label:'Supplier Zone',     group:'Suppliers' },
+  { id:'products',     icon:'❧', label:'Product Database',  group:'Suppliers' },
+  // Clients
+  { id:'clients',      icon:'◉', label:'Client Database',   group:'Clients' },
+  // Finance
+  { id:'financialhub', icon:'⊞', label:'Invoicing',         group:'Finance' },
+  { id:'finance',      icon:'₩', label:'Finance Centre',    group:'Finance' },
+  // Operations
+  { id:'progress',     icon:'▸', label:'Business Progress', group:'Operations' },
+  { id:'actions',      icon:'✓', label:'Action Centre',     group:'Operations' },
+  // Knowledge
+  { id:'documents',    icon:'◻', label:'Documents',         group:'Knowledge' },
+  { id:'strategy',     icon:'⊟', label:'Strategy',          group:'Knowledge' },
   // System
   { id:'settings',     icon:'⚙', label:'Settings',          group:'System' },
 ]
