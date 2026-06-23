@@ -11,7 +11,7 @@ import {
 import { OCR_AVAILABLE } from '../lib/ocr.js'
 import { getStorageUsage, clearAllFiles } from '../lib/fileStore.js'
 
-const APP_VERSION = '2.3.0'
+const APP_VERSION = '2.5.0'
 const DEVICE_ID = (() => {
   let id = localStorage.getItem('bl_device_id')
   if (!id) { id = `device-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; localStorage.setItem('bl_device_id', id) }

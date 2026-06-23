@@ -15,7 +15,6 @@ import BusinessProgress  from './pages/BusinessProgress.jsx'
 import FinanceCentre     from './pages/FinanceCentre.jsx'
 import ActionCentre      from './pages/ActionCentre.jsx'
 import BusinessDocuments from './pages/BusinessDocuments.jsx'
-import Suppliers         from './pages/Suppliers.jsx'
 import Products          from './pages/Products.jsx'
 import Settings          from './pages/Settings.jsx'
 import { FoundersCollection, Strategy } from './pages/OtherPages.jsx'
@@ -249,7 +248,7 @@ export default function App() {
         <Sidebar page={page} setPage={navigate} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} onLogout={handleLogout} />
         <main className="main">
           <PageBoundary pageName={page}>
-            {page === 'dashboard'  && <Dashboard         suppliers={safeSuppliers} products={safeProducts} finance={safeFinance} tasks={safeTasks} documents={safeDocuments} setPage={navigate} />}
+            {page === 'dashboard'  && <Dashboard         suppliers={safeSuppliers} products={safeProducts} finance={safeFinance} tasks={safeTasks} documents={safeDocuments} progress={safeProgress} clients={safeClients} quotes={safeQuotes} invoices={safeInvoices} setPage={navigate} />}
             {page === 'progress'   && <BusinessProgress  progress={safeProgress}   setProgress={setProgress} />}
             {page === 'finance'    && <FinanceCentre      finance={safeFinance}     setFinance={setFinance} />}
             {page === 'actions'    && <ActionCentre       tasks={safeTasks}         setTasks={setTasks} />}

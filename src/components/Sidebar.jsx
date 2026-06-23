@@ -44,7 +44,7 @@ export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, onLo
               <span className="sub">Command Centre</span>
             </div>
           </div>
-          <div className="logo-reg">Reg: 2026/444834/07 · v2.3</div>
+          <div className="logo-reg">Reg: 2026/444834/07 · v2.5</div>
         </div>
 
         {/* Nav */}
