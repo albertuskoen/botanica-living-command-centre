@@ -6,6 +6,8 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import { T } from '../utils/tokens.js'
 import { nextId, safeStr, truncate } from '../utils/format.js'
 import Modal from '../components/Modal.jsx'
+import { OCR_AVAILABLE } from '../lib/ocr.js'
+import { SUPABASE_CONFIGURED, uploadDocument } from '../lib/supabase.js'
 
 // ── Reference plant data ──────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -296,6 +298,420 @@ function EditModal({ item, onSave, onClose }) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// HARVEST MODE — fetch URL, AI-extract reference cards, approve & save
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Image upload: fetch external image → upload to Supabase ──────────────────
+async function uploadImageFromUrl(imageUrl, name) {
+  try {
+    // Use a CORS proxy approach via our own API to avoid direct CORS block
+    const proxyUrl = '/api/extract'
+    const fd = new FormData()
+    fd.append('extractionType', 'fetch_image')
+    fd.append('imageUrl', imageUrl)
+    const res = await fetch(proxyUrl, { method:'POST', body:fd })
+    if (res.ok) {
+      const blob = await res.blob()
+      const ext  = imageUrl.split('.').pop().split('?')[0].toLowerCase() || 'jpg'
+      const file = new File([blob], (name||'reference').replace(/\s+/g,'-') + '.' + ext, { type:blob.type || 'image/jpeg' })
+      if (SUPABASE_CONFIGURED) {
+        const uploaded = await uploadDocument(file, { category:'Reference Library', notes:'Harvested reference image' })
+        return uploaded?.public_url || uploaded?.storage_path ? uploaded : null
+      }
+    }
+  } catch {}
+  return null
+}
+
+// ── AI harvest extraction via /api/extract ────────────────────────────────────
+async function harvestWithAI(url, pageText) {
+  const fd = new FormData()
+  fd.append('extractionType', 'reference_harvest')
+  fd.append('rawText', (pageText || '').slice(0, 10000))
+  fd.append('sourceUrl', url)
+  fd.append('prompt',
+    'You are extracting VISUAL REFERENCE information from a webpage for Botanica Living Group, an artificial greenery company in South Africa.\n\n' +
+    'This is for INTERNAL INSPIRATION ONLY — not inventory, not pricing, not resale.\n\n' +
+    'Extract one or more reference cards from this page. Return ONLY a JSON array. No markdown, no preamble.\n\n' +
+    'Each object must have these fields (empty string if not found):\n' +
+    '{\n' +
+    '  "title": "",\n' +
+    '  "commonName": "",\n' +
+    '  "altNames": "",\n' +
+    '  "category": "Indoor Trees|Olive Trees|Fiddle Leaf Figs|Kentia Palms|Areca Palms|Bird of Paradise|Monstera|Snake Plants|Succulents|Flowering Plants|Orchids|Green Walls|Topiaries|Large Statement Trees|Healthcare Styling|Hospitality Styling|Office Styling|Other",\n' +
+    '  "style": "",\n' +
+    '  "height": "",\n' +
+    '  "applications": "",\n' +
+    '  "indoor": true,\n' +
+    '  "outdoor": false,\n' +
+    '  "imageUrl": "",\n' +
+    '  "tags": ["tag1", "tag2"],\n' +
+    '  "notes": "",\n' +
+    '  "qualityScore": "High|Medium|Low"\n' +
+    '}\n\n' +
+    'DO NOT include: price, stock, add-to-cart, commercial terms, supplier name.\n\n' +
+    'PAGE CONTENT:\n' + (pageText || '').slice(0, 8000)
+  )
+  const res = await fetch('/api/extract', { method:'POST', body:fd })
+  if (!res.ok) throw new Error('API ' + res.status)
+  const data = await res.json()
+  const text = data.text || (Array.isArray(data.content) ? data.content.map(b=>b.text||'').join('') : '')
+  const clean = text.replace(/```json|```/g,'').trim()
+  const parsed = JSON.parse(clean)
+  return Array.isArray(parsed) ? parsed : [parsed]
+}
+
+// ── Heuristic harvest (no AI) ─────────────────────────────────────────────────
+function harvestHeuristic(url, pageText) {
+  const domain = (() => { try { return new URL(url).hostname.replace('www.','') } catch { return url } })()
+  const titleM = pageText.match(/<title[^>]*>([^<]+)<\/title>/i)
+  const h1M    = pageText.match(/<h1[^>]*>([^<]+)<\/h1>/i)
+  const imgM   = pageText.match(/https?:[^"' ]+\.(?:jpg|jpeg|png|webp)/gi) || []
+  const name   = (h1M?.[1]||titleM?.[1]||domain).replace(/<[^>]*>/g,'').trim().slice(0,80)
+  const kws    = (name + ' ' + pageText.slice(0,2000)).toLowerCase()
+  const cat    = kws.includes('olive')?'Olive Trees':kws.includes('fiddle')?'Fiddle Leaf Figs':kws.includes('kentia')?'Kentia Palms':kws.includes('palm')?'Areca Palms':kws.includes('wall')||kws.includes('hedge')?'Green Walls':kws.includes('succul')?'Succulents':kws.includes('orchi')?'Orchids':kws.includes('monstera')?'Monstera':kws.includes('snake')||kws.includes('sansev')?'Snake Plants':kws.includes('bird of paradise')?'Bird of Paradise':kws.includes('topiar')?'Topiaries':'Indoor Trees'
+  const tags   = []
+  if (kws.includes('luxury')||kws.includes('premium')) tags.push('Luxury','Premium')
+  if (kws.includes('hotel')||kws.includes('hospitality')) tags.push('Hospitality')
+  if (kws.includes('office')||kws.includes('corporate')) tags.push('Corporate')
+  if (kws.includes('reception')) tags.push('Reception')
+  if (kws.includes('healthcare')||kws.includes('hospital')) tags.push('Healthcare')
+  const sizeM = (name + pageText.slice(0,3000)).match(/(\d{2,3})\s*cm/i)
+  return [{
+    title: name, commonName: name, altNames: '', category: cat, style: '',
+    height: sizeM ? sizeM[1] + 'cm' : '', applications: '', indoor: true, outdoor: false,
+    imageUrl: imgM[0] || '', tags, notes: 'Heuristic extraction — review and edit.',
+    qualityScore: 'Medium',
+  }]
+}
+
+// ── Duplicate check ───────────────────────────────────────────────────────────
+function findDuplicate(draft, existing) {
+  const norm = s => (s||'').toLowerCase().replace(/\s+/g,' ').trim()
+  return existing.find(e =>
+    (norm(e.name)===norm(draft.title) && norm(e.name).length > 3) ||
+    (e.imageUrl && e.imageUrl===draft.imageUrl) ||
+    (e._sourceUrl && e._sourceUrl===draft._sourceUrl)
+  )
+}
+
+// ── HarvestMode component ─────────────────────────────────────────────────────
+function HarvestMode({ allItems, onSave, onClose }) {
+  const [mode,      setMode]      = useState('single')  // single | category | manual
+  const [url,       setUrl]       = useState('')
+  const [status,    setStatus]    = useState('idle')    // idle | fetching | extracted | saving | done | error
+  const [msg,       setMsg]       = useState('')
+  const [drafts,    setDrafts]    = useState([])        // extracted draft cards
+  const [approved,  setApproved]  = useState(new Set()) // ids of approved drafts
+  const [saving,    setSaving]    = useState(false)
+
+  // Manual fallback state
+  const [manName,   setManName]   = useState('')
+  const [manImg,    setManImg]    = useState('')
+  const [manCat,    setManCat]    = useState('Indoor Trees')
+  const [manNotes,  setManNotes]  = useState('')
+
+  const domain = (() => { try { return new URL(url).hostname.replace('www.','') } catch { return '' } })()
+
+  // ── Fetch and extract ───────────────────────────────────────────────────────
+  const analyse = async () => {
+    if (!url.trim()) return
+    setStatus('fetching'); setMsg('Fetching page…'); setDrafts([]); setApproved(new Set())
+    try {
+      // Fetch via our API proxy to avoid CORS
+      const fd = new FormData()
+      fd.append('extractionType', 'fetch_url')
+      fd.append('targetUrl', url)
+      const proxyRes = await fetch('/api/extract', { method:'POST', body:fd })
+      let pageText = ''
+      if (proxyRes.ok) {
+        const data = await proxyRes.json()
+        pageText = data.html || data.text || ''
+      }
+      // If proxy failed, we only have the URL to work with
+      if (!pageText) setMsg('Page could not be fetched — using URL-based analysis…')
+
+      setMsg(OCR_AVAILABLE ? 'Running AI analysis…' : 'Analysing (heuristic mode)…')
+      let extracted = []
+      if (OCR_AVAILABLE && (pageText.length > 50 || url)) {
+        try { extracted = await harvestWithAI(url, pageText) } catch { extracted = [] }
+      }
+      if (!extracted.length) {
+        extracted = harvestHeuristic(url, pageText)
+      }
+
+      // Stamp with metadata, generate local ids, duplicate check
+      const stamped = extracted.map((d,i) => {
+        const dup = findDuplicate(d, allItems)
+        return {
+          ...d, _draftId: i + 1, _sourceUrl: url, _sourceDomain: domain,
+          _harvestDate: new Date().toISOString().split('T')[0],
+          _duplicate: dup ? dup.name : null,
+          approved: false,
+        }
+      })
+      setDrafts(stamped)
+      setStatus('extracted')
+      setMsg('')
+    } catch (err) {
+      setStatus('error')
+      setMsg('Could not harvest: ' + err.message)
+    }
+  }
+
+  // ── Approve and save ─────────────────────────────────────────────────────────
+  const saveApproved = async () => {
+    const toSave = drafts.filter(d => approved.has(d._draftId))
+    if (!toSave.length) return
+    setSaving(true); setMsg('Saving ' + toSave.length + ' card(s)…')
+
+    const saved = []
+    for (const draft of toSave) {
+      let storedImageUrl = draft.imageUrl
+      // Try to upload image to Supabase if it's an external URL
+      if (draft.imageUrl && draft.imageUrl.startsWith('http') && SUPABASE_CONFIGURED) {
+        setMsg('Uploading image for: ' + (draft.title||'card') + '…')
+        const uploaded = await uploadImageFromUrl(draft.imageUrl, draft.title)
+        if (uploaded?.public_url) storedImageUrl = uploaded.public_url
+        else if (uploaded?.storage_path) storedImageUrl = draft.imageUrl // keep external if upload failed
+      }
+      const card = {
+        ...BLANK_REF,
+        name:          draft.title       || draft.commonName || '',
+        altNames:      draft.altNames    || '',
+        category:      draft.category    || 'Indoor Trees',
+        style:         draft.style       || '',
+        height:        draft.height      || '',
+        applications:  draft.applications|| '',
+        indoor:        draft.indoor      !== false,
+        outdoor:       !!draft.outdoor,
+        tags:          Array.isArray(draft.tags) ? draft.tags : [],
+        notes:         draft.notes       || '',
+        imageUrl:      storedImageUrl    || '',
+        _sourceUrl:    draft._sourceUrl  || url,
+        _sourceDomain: draft._sourceDomain || domain,
+        _originalImgUrl: draft.imageUrl || '',
+        _harvestDate:  draft._harvestDate || new Date().toISOString().split('T')[0],
+        _referenceOnly: true,
+        favourite:     false,
+      }
+      saved.push(card)
+    }
+    onSave(saved)
+    setSaving(false)
+    setStatus('done')
+    setMsg(saved.length + ' reference card(s) saved to library.')
+  }
+
+  // ── Manual save ──────────────────────────────────────────────────────────────
+  const saveManual = () => {
+    if (!manName.trim()) return
+    const card = {
+      ...BLANK_REF,
+      name:          manName,
+      category:      manCat,
+      imageUrl:      manImg,
+      notes:         manNotes,
+      _sourceUrl:    url || '',
+      _sourceDomain: domain,
+      _harvestDate:  new Date().toISOString().split('T')[0],
+      _referenceOnly: true,
+    }
+    onSave([card])
+    setStatus('done')
+    setMsg('Manual reference saved to library.')
+  }
+
+  const toggleApprove = id => setApproved(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const approveAll   = () => setApproved(new Set(drafts.map(d=>d._draftId)))
+  const unapproveAll = () => setApproved(new Set())
+
+  return (
+    <div style={{ maxWidth:800, margin:'0 auto' }}>
+      {/* Header */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
+        <div>
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.forest, marginBottom:4 }}>Harvest Reference</div>
+          <div style={{ fontSize:12, color:T.textMid }}>
+            Paste a product or category URL. AI extracts reference cards for your inspiration library.
+          </div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>← Back to Library</button>
+      </div>
+
+      {/* Legal disclaimer */}
+      <div style={{ padding:'10px 16px', background:'rgba(184,151,90,0.08)', border:`1px solid rgba(184,151,90,0.2)`, borderRadius:10, fontSize:11, color:'#7A5A20', marginBottom:20, lineHeight:1.7 }}>
+        <strong>Internal Reference Only</strong> — Harvested content is saved for inspiration, market study and product education. No pricing, stock or supplier relationships are stored. Images are uploaded to Botanica Living cloud storage for internal use only.
+      </div>
+
+      {/* Mode selector */}
+      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        {[['single','Single Product'],['category','Category Page'],['manual','Manual Entry']].map(([id,label])=>(
+          <button key={id} className={`bp-fbtn ${mode===id?'active':''}`} onClick={()=>{setMode(id);setStatus('idle');setDrafts([]);setMsg('')}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode !== 'manual' ? (
+        <>
+          {/* URL input */}
+          <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+            <input
+              value={url} onChange={e=>setUrl(e.target.value)}
+              placeholder="https://distinctivespaces.co.za/product/..."
+              style={{ flex:1 }}
+              onKeyDown={e=>e.key==='Enter'&&analyse()}
+            />
+            <button className="btn btn-primary" onClick={analyse} disabled={!url||status==='fetching'}>
+              {status==='fetching' ? 'Fetching…' : 'Analyse URL'}
+            </button>
+          </div>
+
+          {msg && (
+            <div style={{ padding:'10px 14px', background:status==='error'?T.redPale:T.tealPale, border:`1px solid ${status==='error'?'rgba(185,28,28,0.2)':T.tealGlow}`, borderRadius:10, fontSize:12, color:status==='error'?T.danger:T.teal, marginBottom:16 }}>
+              {status==='fetching' || status==='extracted' ? '⟳ ' : status==='error' ? '✕ ' : '✓ '}{msg}
+            </div>
+          )}
+
+          {/* Extracted drafts */}
+          {drafts.length > 0 && (
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:T.forest }}>
+                  {drafts.length} card{drafts.length!==1?'s':''} extracted from {domain}
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className="btn btn-outline btn-sm" onClick={approved.size===drafts.length?unapproveAll:approveAll}>
+                    {approved.size===drafts.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={saveApproved} disabled={approved.size===0||saving}>
+                    {saving ? 'Saving…' : `Save ${approved.size} Selected →`}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                {drafts.map(d => (
+                  <div key={d._draftId} style={{
+                    background:'#fff', border:`1.5px solid ${approved.has(d._draftId)?T.gold:'rgba(210,200,184,0.5)'}`,
+                    borderRadius:14, overflow:'hidden', display:'grid', gridTemplateColumns:'160px 1fr',
+                    boxShadow: approved.has(d._draftId) ? '0 4px 16px rgba(184,151,90,0.15)' : '0 1px 4px rgba(0,0,0,0.06)',
+                  }}>
+                    {/* Image preview */}
+                    <div style={{ background:'rgba(228,221,208,0.4)', display:'flex', alignItems:'center', justifyContent:'center', minHeight:120 }}>
+                      {d.imageUrl ? (
+                        <img src={d.imageUrl} alt={d.title} style={{ width:'100%', height:'100%', objectFit:'cover', minHeight:120 }}
+                          onError={e=>{ e.target.style.display='none' }}/>
+                      ) : (
+                        <div style={{ fontSize:40 }}>🌿</div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ padding:'14px 16px' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:T.forest, marginBottom:2 }}>{d.title||'(untitled)'}</div>
+                          <div style={{ fontSize:11, color:T.gold, fontWeight:600 }}>{d.category}</div>
+                        </div>
+                        {/* Approve checkbox */}
+                        <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', flexShrink:0, marginLeft:12 }}>
+                          <input type="checkbox" checked={approved.has(d._draftId)} onChange={()=>toggleApprove(d._draftId)}
+                            style={{ accentColor:T.gold, width:18, height:18 }}/>
+                          <span style={{ fontSize:11, fontWeight:700, color:approved.has(d._draftId)?T.gold:T.textLight }}>
+                            {approved.has(d._draftId)?'Approved':'Approve'}
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Metadata */}
+                      <div style={{ fontSize:11, color:T.textMid, display:'flex', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+                        {d.height && <span>↕ {d.height}</span>}
+                        {d.indoor && <span>Indoor</span>}
+                        {d.outdoor && <span>Outdoor</span>}
+                        <span style={{ color:d.qualityScore==='High'?T.green:d.qualityScore==='Medium'?T.gold:T.textLight, fontWeight:600 }}>
+                          {d.qualityScore} relevance
+                        </span>
+                      </div>
+
+                      {/* Tags */}
+                      {d.tags?.length > 0 && (
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8 }}>
+                          {d.tags.slice(0,5).map(t=>(
+                            <span key={t} style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:'rgba(210,200,184,0.4)', color:T.textMid }}>{t}</span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Duplicate warning */}
+                      {d._duplicate && (
+                        <div style={{ fontSize:11, color:T.gold, padding:'4px 8px', background:T.goldPale, borderRadius:6, marginBottom:6 }}>
+                          ⚑ Similar entry exists: "{d._duplicate}"
+                        </div>
+                      )}
+
+                      {/* Source */}
+                      <div style={{ fontSize:10, color:T.textLight, marginTop:4 }}>
+                        Source: {d._sourceDomain} · {d._harvestDate}
+                        <span style={{ marginLeft:8, padding:'1px 6px', background:'rgba(161,161,170,0.12)', borderRadius:20, fontWeight:600 }}>Reference Only</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {status === 'done' && (
+                <div style={{ marginTop:16, padding:'12px 16px', background:T.greenPale, border:`1px solid rgba(21,128,61,0.2)`, borderRadius:10, fontSize:13, color:T.green, fontWeight:600 }}>
+                  ✓ {msg}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Harvest failed — manual fallback */}
+          {status==='error' && (
+            <div style={{ marginTop:20, padding:18, background:'rgba(228,221,208,0.3)', borderRadius:12, border:`1px solid rgba(210,200,184,0.5)` }}>
+              <div style={{ fontSize:13, fontWeight:600, color:T.forest, marginBottom:12 }}>Manual fallback — paste image URL directly</div>
+              <div className="form-grid">
+                <div className="form-field full"><label>Product Name</label><input value={manName} onChange={e=>setManName(e.target.value)}/></div>
+                <div className="form-field full"><label>Image URL</label><input value={manImg} onChange={e=>setManImg(e.target.value)} placeholder="https://…"/></div>
+                <div className="form-field"><label>Category</label><select value={manCat} onChange={e=>setManCat(e.target.value)}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></div>
+                <div className="form-field"><label>Notes</label><input value={manNotes} onChange={e=>setManNotes(e.target.value)}/></div>
+              </div>
+              <button className="btn btn-primary btn-sm" style={{ marginTop:12 }} onClick={saveManual}>Save Manual Reference</button>
+            </div>
+          )}
+        </>
+      ) : (
+        /* Manual entry mode */
+        <div style={{ padding:20, background:'rgba(228,221,208,0.3)', borderRadius:12, border:`1px solid rgba(210,200,184,0.5)` }}>
+          <div style={{ fontSize:13, color:T.textMid, marginBottom:16, lineHeight:1.7 }}>
+            Paste a product name and image URL manually. Useful when automatic harvesting is blocked.
+          </div>
+          <div className="form-grid">
+            <div className="form-field full"><label>Product Name *</label><input value={manName} onChange={e=>setManName(e.target.value)} placeholder="e.g. Artificial Olive Tree 240cm"/></div>
+            <div className="form-field full"><label>Image URL</label><input value={manImg} onChange={e=>setManImg(e.target.value)} placeholder="https://…"/></div>
+            <div className="form-field"><label>Category</label><select value={manCat} onChange={e=>setManCat(e.target.value)}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div className="form-field"><label>Source URL (optional)</label><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Original page URL"/></div>
+            <div className="form-field full"><label>Notes</label><textarea value={manNotes} onChange={e=>setManNotes(e.target.value)} placeholder="Visual notes, style, typical use…"/></div>
+          </div>
+          {manImg && <img src={manImg} alt="preview" style={{ maxWidth:'100%', maxHeight:200, objectFit:'contain', borderRadius:8, marginTop:12 }} onError={e=>e.target.style.display='none'}/>}
+          <button className="btn btn-primary" style={{ marginTop:14 }} onClick={saveManual} disabled={!manName.trim()}>
+            Save to Reference Library
+          </button>
+          {status==='done' && <div style={{ marginTop:10, fontSize:12, color:T.green, fontWeight:600 }}>✓ {msg}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // MAIN PRODUCT REFERENCE LIBRARY
 // ═════════════════════════════════════════════════════════════════════════════
 export default function ProductRefLibrary({ refItems, setRefItems }) {
@@ -307,6 +723,7 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
   const [editing,    setEditing]    = useState(null)
   const [modal,      setModal]      = useState(false)
   const [showFavs,   setShowFavs]   = useState(false)
+  const [harvesting, setHarvesting] = useState(false)
 
   // Merge seed with user additions (seed IDs are 1-24, user IDs are nextId based)
   const allItems = useMemo(() => {
@@ -343,6 +760,16 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
     setModal(false); setEditing(null)
     if (selected?.id===form.id) setSelected(form)
   }, [refItems, setRefItems, selected])
+
+  // Save multiple harvested cards at once
+  const saveHarvested = useCallback(cards => {
+    const safe = Array.isArray(refItems) ? refItems : []
+    const next = nextId(safe)
+    const stamped = cards.map((card, i) => ({ ...card, id: next + i }))
+    setRefItems(rr => [...(Array.isArray(rr) ? rr : []), ...stamped])
+    setHarvesting(false)
+    setTab('browse')
+  }, [refItems, setRefItems])
 
   const visible = useMemo(() => {
     const q = search.toLowerCase()
@@ -387,6 +814,38 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
       </div>
 
       <div className="page-content">
+        {/* Tab navigation */}
+        {!harvesting && (
+          <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
+            {[
+              {id:'browse',   label:'Browse Library'},
+              {id:'favs',     label:`Favourites (${allItems.filter(i=>i.favourite).length})`},
+            ].map(t=>(
+              <button key={t.id} className={`bp-fbtn ${tab===t.id?'active':''}`} onClick={()=>{setTab(t.id);setShowFavs(t.id==='favs')}}>
+                {t.label}
+              </button>
+            ))}
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ marginLeft:'auto' }}
+              onClick={()=>setHarvesting(true)}
+            >
+              ⟳ Harvest Reference
+            </button>
+          </div>
+        )}
+
+        {/* Harvest mode */}
+        {harvesting && (
+          <HarvestMode
+            allItems={allItems}
+            onSave={saveHarvested}
+            onClose={()=>setHarvesting(false)}
+          />
+        )}
+
+        {harvesting ? null : (
+        <>
         {/* Filter bar */}
         <div style={{ display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center' }}>
           <div style={{ position:'relative',flex:1,minWidth:200 }}>
@@ -430,6 +889,8 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
           </div>
         )}
 
+        </>
+        )}
         {/* Disclaimer */}
         <div style={{ borderTop:`1px solid rgba(210,200,184,0.4)`,paddingTop:20,textAlign:'center',paddingBottom:20 }}>
           <div style={{ fontSize:11,fontWeight:700,color:T.gold,letterSpacing:'0.14em',textTransform:'uppercase',marginBottom:6 }}>Reference Purpose Only</div>

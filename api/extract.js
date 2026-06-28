@@ -46,6 +46,49 @@ export default async function handler(request) {
     }
 
     const extractionType = formData.get('extractionType') || 'invoice'
+
+    // ── fetch_url: proxy-fetch a URL and return its text content ─────────────
+    if (extractionType === 'fetch_url') {
+      const targetUrl = formData.get('targetUrl') || ''
+      if (!targetUrl) return new Response(JSON.stringify({ error:'No URL' }), { status:400, headers: { 'Content-Type':'application/json' } })
+      try {
+        const pageRes = await fetch(targetUrl, {
+          headers: { 'User-Agent':'Mozilla/5.0 (compatible; BotanicaLivingRef/1.0; +https://botanicaliving.co.za)' },
+        })
+        const html = await pageRes.text()
+        return new Response(JSON.stringify({ html: html.slice(0, 50000) }), { headers: { 'Content-Type':'application/json' } })
+      } catch (e) {
+        return new Response(JSON.stringify({ html:'', error: e.message }), { headers: { 'Content-Type':'application/json' } })
+      }
+    }
+
+    // ── fetch_image: proxy-fetch an image for upload to Supabase ─────────────
+    if (extractionType === 'fetch_image') {
+      const imageUrl = formData.get('imageUrl') || ''
+      if (!imageUrl) return new Response(JSON.stringify({ error:'No imageUrl' }), { status:400, headers: { 'Content-Type':'application/json' } })
+      try {
+        const imgRes = await fetch(imageUrl, {
+          headers: { 'User-Agent':'Mozilla/5.0 (compatible; BotanicaLivingRef/1.0)' },
+        })
+        const buf  = await imgRes.arrayBuffer()
+        const type = imgRes.headers.get('content-type') || 'image/jpeg'
+        return new Response(buf, { headers: { 'Content-Type': type } })
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status:500, headers: { 'Content-Type':'application/json' } })
+      }
+    }
+
+    // ── reference_harvest: AI extracts reference cards from page text ─────────
+    if (extractionType === 'reference_harvest') {
+      const rawText   = formData.get('rawText')   || ''
+      const sourceUrl = formData.get('sourceUrl') || ''
+      const prompt    = formData.get('prompt')    || ''
+      if (rawText.trim().length > 20 && secretKey) {
+        const result = await extractReferenceCards(rawText, sourceUrl, prompt, secretKey)
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type':'application/json' } })
+      }
+      return new Response(JSON.stringify({ products:[], error:'Insufficient content' }), { headers: { 'Content-Type':'application/json' } })
+    }
     const supplierName   = formData.get('supplierName')   || ''
     const customPrompt   = formData.get('prompt')         || ''
 
@@ -78,6 +121,28 @@ export default async function handler(request) {
       message: err.message,
     }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
+}
+
+// ── Reference card extraction ─────────────────────────────────────────────────
+async function extractReferenceCards(pageText, sourceUrl, customPrompt, apiKey) {
+  const messages = [{
+    role:'user',
+    content: customPrompt || ('Extract reference cards from this page. Return JSON array only, no markdown.\n\nCONTENT:\n' + pageText.slice(0, 8000)),
+  }]
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01' },
+    body: JSON.stringify({ model:'claude-opus-4-6', max_tokens:2048, messages }),
+  })
+  if (!response.ok) throw new Error('Claude API ' + response.status)
+  const data = await response.json()
+  const text = (data.content||[]).map(b=>b.text||'').join('')
+  try {
+    const clean = text.replace(/```json|```/g,'').trim()
+    const parsed = JSON.parse(clean)
+    const arr = Array.isArray(parsed) ? parsed : [parsed]
+    return { products: arr }
+  } catch { return { products:[], raw:text } }
 }
 
 // ── Helper: convert file to base64 if possible ───────────────────────────────
