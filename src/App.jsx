@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import css from './utils/css.js'
 import useLocalStorage from './hooks/useLocalStorage.js'
 import { flushSyncQueue, SUPABASE_CONFIGURED, loadDocumentsFromCloud, loadTransactionsFromCloud } from './lib/supabase.js'
-import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS, INIT_CLIENTS, INIT_QUOTES, INIT_INVOICES, INIT_EXPENSES } from './utils/data.js'
+import { INIT_SUPPLIERS, INIT_PRODUCTS, INIT_PROGRESS, INIT_FINANCE, INIT_TASKS, INIT_DOCUMENTS, INIT_CLIENTS, INIT_QUOTES, INIT_INVOICES, INIT_EXPENSES, INIT_TENDERS, INIT_REFLIBRARY } from './utils/data.js'
 import { readLocalStorage } from './hooks/useLocalStorage.js'
 import {
   isSessionValid, touchSession, clearSession, isIdleExpired, getAuthConfig,
@@ -18,6 +18,8 @@ import BusinessDocuments from './pages/BusinessDocuments.jsx'
 import Products          from './pages/Products.jsx'
 import Settings          from './pages/Settings.jsx'
 import { FoundersCollection, Strategy } from './pages/OtherPages.jsx'
+import TenderWatch from './pages/TenderWatch.jsx'
+import ProductRefLibrary from './pages/ProductRefLibrary.jsx'
 import SupplierZone from './pages/SupplierZone.jsx'
 import ClientDatabase from './pages/ClientDatabase.jsx'
 import FinancialHub from './pages/FinancialHub.jsx'
@@ -125,6 +127,8 @@ export default function App() {
   const [expenses,      setExpenses]      = useLocalStorage('bl_expenses',       INIT_EXPENSES)
   const [catalogs,      setCatalogs]      = useLocalStorage('bl_catalogs',       [])
   const [catalogProds,  setCatalogProds]  = useLocalStorage('bl_catalog_products',[])
+  const [tenders,       setTenders]       = useLocalStorage('bl_tenders',  INIT_TENDERS)
+  const [refItems,      setRefItems]      = useLocalStorage('bl_reflibrary', INIT_REFLIBRARY)
 
   // ── One-time seed recovery ─────────────────────────────────────────────────
   // If a key exists in localStorage but is empty [], useLocalStorage returns []
@@ -256,6 +260,8 @@ export default function App() {
             {page === 'supplierzone' && <SupplierZone suppliers={safeSuppliers} setSuppliers={setSuppliers} products={safeProducts} catalogs={catalogs} setCatalogs={setCatalogs} catalogProds={catalogProds} setCatalogProds={setCatalogProds} />}
             {page === 'products'     && <Products products={safeProducts} setProducts={setProducts} suppliers={safeSuppliers} />}
             {page === 'clients'      && <ClientDatabase clients={safeClients} setClients={setClients} />}
+            {page === 'reflib'      && <ProductRefLibrary refItems={refItems} setRefItems={setRefItems} />}
+            {page === 'tenderwatch'  && <TenderWatch tenders={tenders} setTenders={setTenders} clients={safeClients} />}
             {page === 'financialhub' && <FinancialHub quotes={safeQuotes} setQuotes={setQuotes} invoices={safeInvoices} setInvoices={setInvoices} expenses={safeExpenses} finance={safeFinance} clients={safeClients} suppliers={safeSuppliers} documents={safeDocuments} />}
             {page === 'founders'     && <FoundersCollection products={safeProducts} />}
             {page === 'strategy'     && <Strategy />}

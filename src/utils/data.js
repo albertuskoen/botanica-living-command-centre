@@ -110,6 +110,9 @@ export const NAV = [
   // Operations
   { id:'progress',     icon:'▸', label:'Business Progress', group:'Operations' },
   { id:'actions',      icon:'✓', label:'Action Centre',     group:'Operations' },
+  // { id:'tenderwatch', label:'Tender Watch', group:'Operations' },  // Hidden — module ready, not yet active
+  // Reference
+  { id:'reflib',       icon:'❧', label:'Reference Library',  group:'Reference' },
   // Knowledge
   { id:'documents',    icon:'◻', label:'Documents',         group:'Knowledge' },
   { id:'strategy',     icon:'⊟', label:'Strategy',          group:'Knowledge' },
@@ -307,6 +310,8 @@ export const INIT_CLIENTS = [
 ]
 
 // ── FINANCIAL HUB SEED DATA ────────────────────────────────────────────────────
+export const INIT_REFLIBRARY = []  // User-added entries; seed data lives in the component
+export const INIT_TENDERS   = []
 export const INIT_QUOTES    = []
 export const INIT_INVOICES  = []
 export const INIT_EXPENSES  = []
