@@ -40,39 +40,116 @@ export default async function handler(request) {
     const formData  = await request.formData()
     const file      = formData.get('file')
     const rawText   = formData.get('rawText') || ''
-
-    if (!file) {
-      return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400 })
-    }
-
     const extractionType = formData.get('extractionType') || 'invoice'
 
-    // ── fetch_url: proxy-fetch a URL and return its text content ─────────────
+    // ── fetch_url: server-side fetch + full image extraction ─────────────────
+    // NOTE: these handlers do NOT require a file — must come before the file guard
     if (extractionType === 'fetch_url') {
       const targetUrl = formData.get('targetUrl') || ''
-      if (!targetUrl) return new Response(JSON.stringify({ error:'No URL' }), { status:400, headers: { 'Content-Type':'application/json' } })
+      if (!targetUrl) {
+        return new Response(JSON.stringify({ error:'No URL' }), { status:400, headers: { 'Content-Type':'application/json' } })
+      }
       try {
         const pageRes = await fetch(targetUrl, {
-          headers: { 'User-Agent':'Mozilla/5.0 (compatible; BotanicaLivingRef/1.0; +https://botanicaliving.co.za)' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-ZA,en;q=0.9',
+          },
         })
-        const html = await pageRes.text()
-        return new Response(JSON.stringify({ html: html.slice(0, 50000) }), { headers: { 'Content-Type':'application/json' } })
+        const html     = await pageRes.text()
+        const baseUrl  = targetUrl.replace(/\/[^\/]*$/, '/')
+        const origin   = (() => { try { const u = new URL(targetUrl); return u.origin } catch { return '' } })()
+
+        // ── Server-side image extraction — all attribute types ──────────────
+        function resolveUrl(u) {
+          if (!u || u.startsWith('data:')) return ''
+          if (u.startsWith('http')) return u
+          if (u.startsWith('//')) return 'https:' + u
+          if (u.startsWith('/')) return origin + u
+          return baseUrl + u
+        }
+        function bestFromSrcset(srcset) {
+          if (!srcset) return ''
+          const parts = srcset.split(',').map(s => s.trim().split(/\s+/))
+          // Sort by declared width (largest first), fall back to last entry
+          const sorted = parts.sort((a, b) => {
+            const wa = parseInt(a[1]) || 0
+            const wb = parseInt(b[1]) || 0
+            return wb - wa
+          })
+          return sorted[0]?.[0] || ''
+        }
+        // Extract all img tags with every possible lazy-load attribute
+        const imgCandidates = []
+        const imgTagRe = /<img[^>]*>/gi
+        let imgMatch
+        while ((imgMatch = imgTagRe.exec(html)) !== null) {
+          const tag = imgMatch[0]
+          const getAttr = (attr) => {
+            const m = tag.match(new RegExp(attr + '=["\'`]([^"\'`>]+)["\'`]', 'i'))
+            return m ? m[1].trim() : ''
+          }
+          const src        = resolveUrl(getAttr('src'))
+          const dataSrc    = resolveUrl(getAttr('data-src'))
+          const dataLazy   = resolveUrl(getAttr('data-lazy-src') || getAttr('data-lazy'))
+          const dataWpSrc  = resolveUrl(getAttr('data-large_image') || getAttr('data-full-url'))
+          const srcset     = resolveUrl(bestFromSrcset(getAttr('srcset') || getAttr('data-srcset')))
+          const alt        = getAttr('alt')
+          const best = dataWpSrc || dataLazy || dataSrc || srcset || src
+          if (best && !best.includes('placeholder') && !best.includes('blank.gif') &&
+              !best.includes('spinner') && best.match(/\.(jpg|jpeg|png|webp|avif)/i)) {
+            imgCandidates.push({
+              best, src, dataSrc, dataLazy, srcset: getAttr('srcset'), alt,
+              isLazyLoaded: !!(dataSrc || dataLazy),
+            })
+          }
+        }
+        // Extract product titles from WooCommerce / Shopify patterns
+        const productTitles = []
+        const titleRe = /<(?:h2|h3)[^>]*class="[^"]*(?:product[_-]title|woocommerce-loop-product__title|product-item-title)[^"]*"[^>]*>([^<]+)</gi
+        let titleMatch
+        while ((titleMatch = titleRe.exec(html)) !== null) {
+          productTitles.push(titleMatch[1].trim())
+        }
+        // Also try <a title=> on product links
+        const linkTitles = []
+        const linkRe = /class="[^"]*woocommerce-LoopProduct-link[^"]*"[^>]*title="([^"]+)"/gi
+        let linkMatch
+        while ((linkMatch = linkRe.exec(html)) !== null) {
+          linkTitles.push(linkMatch[1].trim())
+        }
+
+        return new Response(JSON.stringify({
+          html:           html.slice(0, 60000),
+          images:         imgCandidates.slice(0, 40),  // top 40 candidates
+          productTitles:  productTitles.slice(0, 20),
+          linkTitles:     linkTitles.slice(0, 20),
+          httpStatus:     pageRes.status,
+          fetchOk:        pageRes.ok,
+          origin,
+          baseUrl,
+        }), { headers: { 'Content-Type':'application/json' } })
       } catch (e) {
-        return new Response(JSON.stringify({ html:'', error: e.message }), { headers: { 'Content-Type':'application/json' } })
+        return new Response(JSON.stringify({ html:'', images:[], error: e.message }), { headers: { 'Content-Type':'application/json' } })
       }
     }
 
-    // ── fetch_image: proxy-fetch an image for upload to Supabase ─────────────
+    // ── fetch_image: server-side proxy download for Supabase upload ───────────
     if (extractionType === 'fetch_image') {
       const imageUrl = formData.get('imageUrl') || ''
       if (!imageUrl) return new Response(JSON.stringify({ error:'No imageUrl' }), { status:400, headers: { 'Content-Type':'application/json' } })
       try {
         const imgRes = await fetch(imageUrl, {
-          headers: { 'User-Agent':'Mozilla/5.0 (compatible; BotanicaLivingRef/1.0)' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': (() => { try { return new URL(imageUrl).origin } catch { return '' } })(),
+          },
         })
+        if (!imgRes.ok) throw new Error('HTTP ' + imgRes.status)
         const buf  = await imgRes.arrayBuffer()
         const type = imgRes.headers.get('content-type') || 'image/jpeg'
-        return new Response(buf, { headers: { 'Content-Type': type } })
+        return new Response(buf, { headers: { 'Content-Type': type, 'X-Image-Size': String(buf.byteLength) } })
       } catch (e) {
         return new Response(JSON.stringify({ error: e.message }), { status:500, headers: { 'Content-Type':'application/json' } })
       }
@@ -80,15 +157,22 @@ export default async function handler(request) {
 
     // ── reference_harvest: AI extracts reference cards from page text ─────────
     if (extractionType === 'reference_harvest') {
-      const rawText   = formData.get('rawText')   || ''
-      const sourceUrl = formData.get('sourceUrl') || ''
-      const prompt    = formData.get('prompt')    || ''
-      if (rawText.trim().length > 20 && secretKey) {
-        const result = await extractReferenceCards(rawText, sourceUrl, prompt, secretKey)
+      const harvestText  = formData.get('rawText')   || ''
+      const sourceUrl    = formData.get('sourceUrl') || ''
+      const harvestPrompt= formData.get('prompt')    || ''
+      if (harvestText.trim().length > 20 && secretKey) {
+        const result = await extractReferenceCards(harvestText, sourceUrl, harvestPrompt, secretKey)
         return new Response(JSON.stringify(result), { headers: { 'Content-Type':'application/json' } })
       }
       return new Response(JSON.stringify({ products:[], error:'Insufficient content' }), { headers: { 'Content-Type':'application/json' } })
     }
+    // All remaining handlers require a file upload
+    if (!file) {
+      return new Response(JSON.stringify({ error: 'No file provided' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const supplierName   = formData.get('supplierName')   || ''
     const customPrompt   = formData.get('prompt')         || ''
 
