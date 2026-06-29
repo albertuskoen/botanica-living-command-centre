@@ -166,6 +166,39 @@ export default async function handler(request) {
       }
       return new Response(JSON.stringify({ products:[], error:'Insufficient content' }), { headers: { 'Content-Type':'application/json' } })
     }
+    // ── image_search: web image search for reference library ─────────────────
+    if (extractionType === 'image_search') {
+      const query    = formData.get('query') || ''
+      const maxCount = parseInt(formData.get('max') || '6', 10)
+      if (!query) return new Response(JSON.stringify({ images:[], error:'No query' }), { headers:{ 'Content-Type':'application/json' } })
+      try {
+        const serpKey = process.env.SERPAPI_KEY || ''
+        const bingKey = process.env.BING_SEARCH_KEY || ''
+
+        if (serpKey) {
+          const params = new URLSearchParams({ engine:'google_images', q:query, num:String(maxCount), safe:'active', api_key:serpKey, ijn:'0' })
+          const res  = await fetch('https://serpapi.com/search?' + params)
+          const data = await res.json()
+          const imgs = (data.images_results || []).slice(0, maxCount).map(img => ({ url:img.original||img.thumbnail, thumbUrl:img.thumbnail, sourceUrl:img.link||'', title:img.title||query }))
+          return new Response(JSON.stringify({ images:imgs, query, engine:'serpapi' }), { headers:{ 'Content-Type':'application/json' } })
+        }
+
+        if (bingKey) {
+          const params = new URLSearchParams({ q:query, count:String(maxCount), safeSearch:'Moderate', imageType:'Photo' })
+          const res  = await fetch('https://api.bing.microsoft.com/v7.0/images/search?' + params, { headers:{ 'Ocp-Apim-Subscription-Key':bingKey } })
+          const data = await res.json()
+          const imgs = (data.value || []).slice(0, maxCount).map(img => ({ url:img.contentUrl, thumbUrl:img.thumbnailUrl, sourceUrl:img.hostPageUrl||'', title:img.name||query }))
+          return new Response(JSON.stringify({ images:imgs, query, engine:'bing' }), { headers:{ 'Content-Type':'application/json' } })
+        }
+
+        // No API key — use Unsplash source (free, no auth, real photos)
+        const imgs = buildFallbackImages(query)
+        return new Response(JSON.stringify({ images:imgs, query, engine:'unsplash', note:'Add SERPAPI_KEY or BING_SEARCH_KEY to Vercel env for full image search.' }), { headers:{ 'Content-Type':'application/json' } })
+      } catch (e) {
+        return new Response(JSON.stringify({ images:[], error:e.message }), { headers:{ 'Content-Type':'application/json' } })
+      }
+    }
+
     // All remaining handlers require a file upload
     if (!file) {
       return new Response(JSON.stringify({ error: 'No file provided' }), {
@@ -205,6 +238,39 @@ export default async function handler(request) {
       message: err.message,
     }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
+}
+
+// ── Fallback images via Unsplash source (free, no key) ───────────────────────
+function buildFallbackImages(query) {
+  const q = query.toLowerCase()
+  const kw =
+    q.includes('olive')         ? 'olive+tree+indoor' :
+    q.includes('fiddle')        ? 'fiddle+leaf+fig' :
+    q.includes('kentia')        ? 'kentia+palm+indoor' :
+    q.includes('areca')         ? 'areca+palm+plant' :
+    q.includes('bird of para')  ? 'bird+of+paradise+plant' :
+    q.includes('monstera')      ? 'monstera+plant' :
+    q.includes('snake')         ? 'snake+plant+sansevieria' :
+    q.includes('succulent')     ? 'succulent+plants' :
+    q.includes('orchid')        ? 'orchid+white+flower' :
+    q.includes('green wall')    ? 'green+wall+indoor+plants' :
+    q.includes('vertical')      ? 'vertical+garden+wall' :
+    q.includes('hedge')         ? 'boxwood+hedge+green' :
+    q.includes('topiar')        ? 'topiary+garden+plants' :
+    q.includes('hanging')       ? 'hanging+plants+indoor' :
+    q.includes('pothos')        ? 'pothos+trailing+plant' :
+    q.includes('cherry')        ? 'cherry+blossom+tree' :
+    q.includes('baobab')        ? 'baobab+tree' :
+    q.includes('palm')          ? 'palm+tree+indoor' :
+    q.includes('planter')       ? 'indoor+planter+pot' :
+    'artificial+plant+interior'
+  return [1,2,3,4,5,6].map(i => ({
+    url:       'https://source.unsplash.com/400x400/?' + kw + '&sig=' + i,
+    thumbUrl:  'https://source.unsplash.com/200x200/?' + kw + '&sig=' + i,
+    sourceUrl: 'https://unsplash.com',
+    title:     query + ' — Unsplash reference',
+    isUnsplash: true,
+  }))
 }
 
 // ── Reference card extraction ─────────────────────────────────────────────────

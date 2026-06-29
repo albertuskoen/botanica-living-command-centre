@@ -65,6 +65,176 @@ const SEED_REFS = [
   { id:24, category:'Green Walls',          name:'Artificial Hedge Panel', altNames:'Boxwood Hedge, Privacy Hedge, Garden Hedge', tags:['Outdoor','Privacy','Event','Retail'], height:'Panel: 50×50cm or 100×100cm', width:'Modular', style:'Formal, Natural, Clean', indoor:true, outdoor:true, premium:false, hospitality:true, healthcare:false, corporate:false, residential:true, retail:true, commercial:true, notes:'Flat boxwood-style hedge panels in modular format. UV-treated for outdoor use. Very popular for event backdrops, retail photo ops and outdoor dining privacy screens. Available in multiple shades of green.', applications:'Outdoor event backdrops, restaurant outdoor dividers, retail photo walls, residential garden screening', imageUrl:'', favourite:false },
 ]
 
+// ── Build a search query for a reference item ────────────────────────────────
+function buildSearchQuery(item) {
+  const name = safeStr(item.name)
+  const base = name.toLowerCase().includes('artificial') ? name : 'Artificial ' + name
+  const ctx  = item.hospitality ? 'hotel interior' : item.healthcare ? 'healthcare interior' : item.corporate ? 'office interior' : 'indoor'
+  return (base + ' ' + ctx).trim()
+}
+
+// ── Search for images via /api/extract ────────────────────────────────────────
+async function searchImages(query) {
+  const fd = new FormData()
+  fd.append('extractionType', 'image_search')
+  fd.append('query', query)
+  fd.append('max', '6')
+  try {
+    const res  = await fetch('/api/extract', { method:'POST', body:fd })
+    const data = await res.json()
+    return { images: data.images || [], engine: data.engine || 'unknown', note: data.note || '', error: data.error || '' }
+  } catch (e) {
+    return { images:[], error: e.message }
+  }
+}
+
+// ── Upload image from URL to Supabase (shared with harvest mode) ──────────────
+async function uploadRefImage(imageUrl, itemName) {
+  try {
+    const fd = new FormData()
+    fd.append('extractionType', 'fetch_image')
+    fd.append('imageUrl', imageUrl)
+    const res = await fetch('/api/extract', { method:'POST', body:fd })
+    if (!res.ok) throw new Error('Proxy ' + res.status)
+    const blob = await res.blob()
+    if (blob.size < 500) throw new Error('Too small')
+    if (SUPABASE_CONFIGURED) {
+      const ext  = imageUrl.split('.').pop().split('?')[0].toLowerCase().replace(/[^a-z]/g,'') || 'jpg'
+      const safe = (itemName||'ref').replace(/[^a-z0-9]/gi,'-').slice(0,40)
+      const file = new File([blob], safe + '-' + Date.now() + '.' + ext, { type:blob.type||'image/jpeg' })
+      const up   = await uploadDocument(file, { category:'Reference Library', notes:'Reference image — internal use only' })
+      if (up?.public_url) return { url:up.public_url, savedToCloud:true }
+    }
+    return { url:imageUrl, savedToCloud:false }
+  } catch { return { url:imageUrl, savedToCloud:false } }
+}
+
+// ── FindImage modal — search + select + save for one item ────────────────────
+function FindImage({ item, onSave, onClose }) {
+  const [query,     setQuery]     = useState(buildSearchQuery(item))
+  const [results,   setResults]   = useState(null)   // { images, engine, note, error }
+  const [selected,  setSelected]  = useState(null)
+  const [manualUrl, setManualUrl] = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [saveMsg,   setSaveMsg]   = useState('')
+
+  const search = async () => {
+    setResults(null); setSelected(null); setSaveMsg('')
+    const r = await searchImages(query)
+    setResults(r)
+  }
+
+  const approve = async (imgUrl, sourceUrl) => {
+    setSaving(true); setSaveMsg('Uploading to cloud storage…')
+    const { url, savedToCloud } = await uploadRefImage(imgUrl, item.name)
+    onSave({
+      imageUrl:           url,
+      imageSourceUrl:     sourceUrl || imgUrl,
+      imageSavedToCloud:  savedToCloud,
+      imageSearchQuery:   query,
+      _referenceOnly:     true,
+    })
+    setSaveMsg(savedToCloud ? '✓ Saved to cloud storage' : '✓ Saved (external URL)')
+    setSaving(false)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div style={{ background:'#fff', borderRadius:20, width:'min(96vw,780px)', maxHeight:'90vh', overflow:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.18)' }} onClick={e=>e.stopPropagation()}>
+        <div style={{ padding:'22px 26px', borderBottom:`1px solid rgba(210,200,184,0.5)`, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.forest, marginBottom:3 }}>
+              Find Reference Image
+            </div>
+            <div style={{ fontSize:12, color:T.textMid }}>{safeStr(item.name)} · {item.category}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:18, cursor:'pointer', color:T.textLight }}>✕</button>
+        </div>
+
+        <div style={{ padding:'18px 26px' }}>
+          {/* Disclaimer */}
+          <div style={{ padding:'8px 14px', background:'rgba(184,151,90,0.08)', border:`1px solid rgba(184,151,90,0.2)`, borderRadius:8, fontSize:11, color:'#7A5A20', marginBottom:16, lineHeight:1.6 }}>
+            <strong>Reference Image Only</strong> — Images are saved for internal inspiration and product education. Not stock, not supplier data, not pricing, not commercial affiliation.
+          </div>
+
+          {/* Search bar */}
+          <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+            <input value={query} onChange={e=>setQuery(e.target.value)} style={{ flex:1 }}
+              onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Search query…"/>
+            <button className="btn btn-primary" onClick={search}>Search Images</button>
+          </div>
+
+          {/* Engine note */}
+          {results?.note && (
+            <div style={{ fontSize:11, color:T.gold, padding:'6px 10px', background:T.goldPale, borderRadius:8, marginBottom:14 }}>
+              ⚑ {results.note}
+            </div>
+          )}
+          {results?.error && (
+            <div style={{ fontSize:11, color:T.danger, marginBottom:12 }}>Search error: {results.error}</div>
+          )}
+
+          {/* Image grid */}
+          {results && results.images.length > 0 && (
+            <div>
+              <div style={{ fontSize:12, color:T.textMid, marginBottom:10 }}>
+                {results.images.length} images · {results.engine} · Click to select
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
+                {results.images.map((img, i) => (
+                  <div key={i} onClick={()=>setSelected(img)}
+                    style={{ borderRadius:10, overflow:'hidden', cursor:'pointer', border:`2px solid ${selected===img?T.gold:'rgba(210,200,184,0.4)'}`, position:'relative', boxShadow:selected===img?'0 4px 16px rgba(184,151,90,0.3)':'none' }}>
+                    <img src={img.thumbUrl||img.url} alt={img.title} style={{ width:'100%', height:140, objectFit:'cover', display:'block' }}
+                      onError={e=>{ e.target.src=img.url; e.target.onerror=()=>e.target.style.display='none' }}/>
+                    {selected===img && (
+                      <div style={{ position:'absolute', top:6, right:6, background:T.gold, color:'#fff', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700 }}>✓</div>
+                    )}
+                    {img.isUnsplash && (
+                      <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(0,0,0,0.5)', color:'#fff', fontSize:9, padding:'2px 6px', textAlign:'center' }}>Unsplash — public reference</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {selected && (
+                <div style={{ display:'flex', gap:10, alignItems:'center', padding:'12px 14px', background:T.greenPale, borderRadius:10, marginBottom:14 }}>
+                  <img src={selected.thumbUrl||selected.url} alt="selected" style={{ width:50, height:50, objectFit:'cover', borderRadius:8 }}/>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:T.forest, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{selected.title}</div>
+                    <div style={{ fontSize:10, color:T.textMid }}>Source: {selected.sourceUrl||'image search'}</div>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={()=>approve(selected.url, selected.sourceUrl)} disabled={saving}>
+                    {saving ? 'Saving…' : 'Use This Image →'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {results && results.images.length === 0 && !results.error && (
+            <div style={{ textAlign:'center', padding:'24px 0', color:T.textMid, fontSize:13 }}>
+              No images found for that search. Try a different query or paste a URL below.
+            </div>
+          )}
+
+          {/* Manual URL fallback */}
+          <div style={{ borderTop:`1px solid rgba(210,200,184,0.4)`, paddingTop:14, marginTop:results?4:0 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:T.textMid, marginBottom:8 }}>Or paste an image URL directly:</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <input value={manualUrl} onChange={e=>setManualUrl(e.target.value)} placeholder="https://…" style={{ flex:1 }}/>
+              <button className="btn btn-outline btn-sm" onClick={()=>approve(manualUrl, '')} disabled={!manualUrl||saving}>
+                {saving ? 'Saving…' : 'Use URL'}
+              </button>
+            </div>
+            {manualUrl && <img src={manualUrl} alt="preview" style={{ marginTop:8, maxWidth:'100%', maxHeight:160, objectFit:'contain', borderRadius:8 }} onError={e=>e.target.style.display='none'}/>}
+          </div>
+
+          {saveMsg && <div style={{ marginTop:12, fontSize:12, color:T.green, fontWeight:600 }}>{saveMsg}</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const BLANK_REF = {
   category:'Indoor Trees', name:'', altNames:'', tags:[], style:'',
   height:'', width:'', notes:'', applications:'', examples:'',
@@ -135,7 +305,7 @@ function PlantImage({ item, size = 'card' }) {
 }
 
 // ── Product card ──────────────────────────────────────────────────────────────
-function RefCard({ item, onClick, onFavourite, onEdit }) {
+function RefCard({ item, onClick, onFavourite, onEdit, onFindImage }) {
   return (
     <div style={{
       background:'#fff', borderRadius:16, overflow:'hidden',
@@ -167,6 +337,14 @@ function RefCard({ item, onClick, onFavourite, onEdit }) {
         <div style={{ fontSize:10,color:T.gold,letterSpacing:'0.12em',textTransform:'uppercase',fontWeight:600,marginBottom:3 }}>{item.category}</div>
         <div style={{ fontFamily:"'Cormorant Garamond',serif",fontSize:16,color:T.forest,marginBottom:4,lineHeight:1.3 }}>{item.name}</div>
         {item.height && <div style={{ fontSize:11,color:T.textMid,marginBottom:6 }}>↕ {item.height}</div>}
+        {!item.imageUrl && (
+          <button onClick={e=>{e.stopPropagation();onFindImage&&onFindImage(item)}} className="btn btn-outline btn-xs" style={{ color:T.gold,borderColor:T.gold,marginBottom:6 }}>
+            ⊕ Find Image
+          </button>
+        )}
+        {item.imageSavedToCloud===false && item.imageUrl && (
+          <div style={{ fontSize:9,color:T.textLight,marginBottom:3 }}>⚑ External URL</div>
+        )}
         {/* Application dots */}
         <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
           {item.hospitality && <span style={{ fontSize:9,padding:'2px 6px',borderRadius:20,background:T.tealPale,color:T.teal,fontWeight:600 }}>Hotel</span>}
@@ -904,7 +1082,10 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
   const [editing,    setEditing]    = useState(null)
   const [modal,      setModal]      = useState(false)
   const [showFavs,   setShowFavs]   = useState(false)
-  const [harvesting, setHarvesting] = useState(false)
+  const [harvesting,   setHarvesting]   = useState(false)
+  const [findingImage, setFindingImage] = useState(null)  // item to find image for
+  const [autoFinding,  setAutoFinding]  = useState(false)
+  const [autoMsg,      setAutoMsg]      = useState('')
 
   // Merge seed with user additions (seed IDs are 1-24, user IDs are nextId based)
   const allItems = useMemo(() => {
@@ -951,6 +1132,48 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
     setHarvesting(false)
     setTab('browse')
   }, [refItems, setRefItems])
+
+  // Save image fields to an existing item (seed or user)
+  const saveImageToItem = useCallback((item, imageFields) => {
+    const safe = Array.isArray(refItems) ? refItems : []
+    const inUser = safe.find(r => r.id === item.id)
+    if (inUser) {
+      setRefItems(rr => rr.map(r => r.id === item.id ? { ...r, ...imageFields } : r))
+    } else {
+      // Seed entry — move to user store with image
+      setRefItems(rr => [...(Array.isArray(rr) ? rr : []).filter(r => r.id !== item.id), { ...item, ...imageFields }])
+    }
+    setFindingImage(null)
+  }, [refItems, setRefItems])
+
+  // Auto-find images for all items without imageUrl
+  const autoFindImages = useCallback(async () => {
+    const missing = allItems.filter(i => !i.imageUrl)
+    if (!missing.length) return
+    setAutoFinding(true)
+    let done = 0
+    for (const item of missing) {
+      setAutoMsg('Searching: ' + item.name + ' (' + (done+1) + '/' + missing.length + ')…')
+      const q = buildSearchQuery(item)
+      const result = await searchImages(q)
+      if (result.images.length > 0) {
+        const img = result.images[0]
+        const { url, savedToCloud } = await uploadRefImage(img.url, item.name)
+        const fields = { imageUrl:url, imageSourceUrl:img.sourceUrl||img.url, imageSavedToCloud:savedToCloud, imageSearchQuery:q, _referenceOnly:true }
+        const safe = Array.isArray(refItems) ? refItems : []
+        const inUser = safe.find(r => r.id === item.id)
+        if (inUser) {
+          setRefItems(rr => rr.map(r => r.id === item.id ? { ...r, ...fields } : r))
+        } else {
+          setRefItems(rr => [...(Array.isArray(rr) ? rr : []).filter(r => r.id !== item.id), { ...item, ...fields }])
+        }
+      }
+      done++
+    }
+    setAutoFinding(false)
+    setAutoMsg('Done — ' + done + ' items processed.')
+    setTimeout(() => setAutoMsg(''), 4000)
+  }, [allItems, refItems, setRefItems])
 
   const visible = useMemo(() => {
     const q = search.toLowerCase()
@@ -1006,13 +1229,17 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
                 {t.label}
               </button>
             ))}
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ marginLeft:'auto' }}
-              onClick={()=>setHarvesting(true)}
-            >
-              ⟳ Harvest Reference
-            </button>
+            <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              {autoMsg && <span style={{ fontSize:11, color:T.green, fontWeight:600 }}>{autoMsg}</span>}
+              {allItems.filter(i=>!i.imageUrl).length > 0 && (
+                <button className="btn btn-outline btn-sm" style={{ color:T.gold, borderColor:T.gold }} onClick={autoFindImages} disabled={autoFinding}>
+                  {autoFinding ? '⟳ Searching…' : ('⊕ Auto-find images (' + allItems.filter(i=>!i.imageUrl).length + ')')}
+                </button>
+              )}
+              <button className="btn btn-primary btn-sm" onClick={()=>setHarvesting(true)}>
+                ⟳ Harvest Reference
+              </button>
+            </div>
           </div>
         )}
 
@@ -1065,7 +1292,7 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
         ) : (
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:20,marginBottom:40 }}>
             {visible.map(item=>(
-              <RefCard key={item.id} item={item} onClick={setSelected} onFavourite={toggleFavourite} onEdit={i=>{setEditing(i);setModal(true)}} />
+              <RefCard key={item.id} item={item} onClick={setSelected} onFavourite={toggleFavourite} onEdit={i=>{setEditing(i);setModal(true)}} onFindImage={setFindingImage} />
             ))}
           </div>
         )}
@@ -1084,6 +1311,11 @@ export default function ProductRefLibrary({ refItems, setRefItems }) {
       {/* Detail lightbox */}
       {selected && (
         <RefDetail item={selected} onClose={()=>setSelected(null)} onFavourite={toggleFavourite} onEdit={i=>{setEditing(i);setModal(true);setSelected(null)}} />
+      )}
+
+      {/* Find Image modal */}
+      {findingImage && (
+        <FindImage item={findingImage} onSave={fields=>saveImageToItem(findingImage,fields)} onClose={()=>setFindingImage(null)} />
       )}
 
       {/* Edit modal */}
